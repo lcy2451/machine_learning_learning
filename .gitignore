@@ -1,0 +1,5 @@
+# 本地 IDE 配置
+.idea/
+
+# Excel 临时锁定文件
+~$*.xlsx
