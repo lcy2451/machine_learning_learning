@@ -105,67 +105,49 @@ def train(x:torch.Tensor, y:torch.Tensor, loss_fn, model, in_feature_names,
 
     epochs = range(1, number_epochs + 1)
 
-    seconds = torch.linspace(
-        x[:, 1].min().item(),
-        x[:, 1].max().item(),
-        steps=20
-    )
-
-    # 在里程、时长的范围内，各取 20 个数
-    miles = torch.linspace(
-        x[:, 0].min().item(),
-        x[:, 0].max().item(),
-        steps=20
-    )
-
-    # # 生成网格：每一个里程都搭配全部 20 个时长
-    # # 共得到 20 × 20 = 400 组组合
-    grid_miles, grid_seconds = torch.meshgrid(
-        miles, seconds, indexing="ij"
-    )
-
-    # 将网格整理成模型要求的形状：[400, 2]
-    # 每一行依然是：[里程, 时长]
-    grid_x = torch.stack(
-        [grid_miles.reshape(-1), grid_seconds.reshape(-1)],
-        dim=1
+    # 直接预测绘图用的真实行程，特征列的顺序与训练时一致。
+    # 每一行预测都与 plot_df 中同一行的真实车费对应。
+    # plot_df 是从训练数据抽取的最多 200 条行程，不是独立测试集。
+    # 只选输入列，不将真实车费 FARE 传给模型；两输入时形状为 [样本数, 2]。
+    plot_x = torch.tensor(
+        plot_df[in_feature_names].values,
+        dtype=torch.float
     )
 
     model.eval()
 
     with torch.no_grad():
-        # grid_predictions = model(line_x)
-        line_y = model(grid_x)
+        # 返回预测车费 y_hat，形状为 [样本数, 1]，顺序与 plot_x 的行一致。
+        # 真实 y 保存在 plot_df 的 FARE 列；这里只预测，不更新模型参数。
+        plot_predictions = model(plot_x)
 
-    # print(len(grid_x))
-    # print(len(grid_predictions))
     show_predictions_plt(
         epochs=epochs,
         loss_history=loss_history,
         rmse_history=rmse_history,
-        x=x, y=y, loss_fn=loss_fn, model=model,
+        loss_fn=loss_fn,
         in_feature_names=in_feature_names,
         out_feature_names=out_feature_names,
-        plot_df=plot_df, line_x=grid_x, line_y=line_y)
-    # pprint(line_y.shape)
-    # pprint(grid_x.shape)
+        plot_df=plot_df, plot_predictions=plot_predictions)
 
 
 def show_predictions_plt(
-        epochs, loss_history, rmse_history, x:torch.Tensor, y:torch.Tensor, loss_fn, model,
+        epochs, loss_history, rmse_history, loss_fn,
         in_feature_names, out_feature_names, plot_df:pd.Series | pd.DataFrame,
-        line_x, line_y):
+        plot_predictions):
     # 设置中文字体
     plt.rcParams["font.sans-serif"] = ["Microsoft YaHei"]
 
     # 正常显示负号
     plt.rcParams["axes.unicode_minus"] = False
 
-    fig = plt.figure(figsize=(18, 5))
+    # 第一行显示训练指标，后续每行最多放三张特征对比图。
+    nrows = 1 + (len(in_feature_names) + 2) // 3
+    fig = plt.figure(figsize=(18, 4 * nrows))
 
     axes = [
-        fig.add_subplot(2, 3, 1),  # Loss
-        fig.add_subplot(2, 3, 2),  # RMSE
+        fig.add_subplot(nrows, 3, 1),  # Loss
+        fig.add_subplot(nrows, 3, 2),  # RMSE
 
     ]
 
@@ -192,23 +174,35 @@ def show_predictions_plt(
 
     print('\n\n')
     _index = 4
-    for _in_features in range(x.shape[1]):
-        subplot = fig.add_subplot(2, 3, _index)
-        subplot.set_title(f"预测 {in_feature_names[_in_features]}")
+    # 每张图只更换横轴特征，纵轴始终使用同一批真实车费和预测车费。
+    # 每个预测车费由全部输入共同计算，不是只用当前横轴特征重新预测。
+    for _in_features in range(len(in_feature_names)):
+        subplot = fig.add_subplot(nrows, 3, _index)
+        subplot.set_title(f"{in_feature_names[_in_features]} 与车费对比")
         subplot.set_xlabel(in_feature_names[_in_features])
         subplot.set_ylabel(out_feature_names[0])
+        # 蓝点：当前特征作为横坐标，同一条行程的真实车费作为纵坐标。
         subplot.scatter(
             plot_df[in_feature_names[_in_features]],
-            plot_df["FARE"],
+            plot_df[out_feature_names[0]],
+            color="blue",
             alpha=0.5,
             label=f"实际 {out_feature_names[0]}"
         )
 
-        subplot.plot(
-            line_x[:, _in_features].numpy(),
-            line_y.numpy().flatten(),
+        # 同一批行程、相同的横坐标；两组点的纵向差距是预测误差。
+        # 多个特征共同决定车费，不把这些预测点连接成拟合直线。
+        # numpy() 转成绘图库可用的数组，flatten() 将预测值从 [样本数, 1] 展为 [样本数]。
+        subplot.scatter(
+            plot_df[in_feature_names[_in_features]],
+            plot_predictions.numpy().flatten(),
+            color="orange",
+            marker="x",
+            alpha=0.6,
             label=f"预计 {out_feature_names[0]}"
         )
+        subplot.legend()
+        subplot.grid(True)
         axes.append(subplot)
         _index += 1
         # print(_in_features)
@@ -246,13 +240,6 @@ if __name__ == '__main__':
 
     _training_df['COMPANY'] = _training_df['COMPANY'].astype(float)
 
-    # 可以选择随机抽样， 用一部分数据来训练， 这里我选择用全部的数据
-    # 可选
-    # training_df = training_df.sample(
-    #     n=min(200, len(training_df)),
-    #     random_state=42
-    # )
-
     _in_feature_names = ['TRIP_MILES', 'TRIP_SECONDS']
     _out_feature_names = ['FARE']
     _x: torch.Tensor = torch.tensor(
@@ -264,14 +251,11 @@ if __name__ == '__main__':
     # print(x.shape)
     # print(y.shape)
     _number_epochs = 60
-    # _number_epochs = 10
-    # _number_epochs = 1
     _batch_size = 50
     # 学习率
     _learning_rate = 0.001
-    # print(type(x))
 
-    # 预测直线
+    # 抽取真实行程，用于对比实际车费和预测车费
     _plot_df = _training_df.sample(
         n=min(200, len(_training_df)),
         random_state=42
