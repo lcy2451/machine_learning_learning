@@ -1,0 +1,67 @@
+{
+  "name": "taxi-fare-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "使用本地 ONNX 模型预测车费的学习应用",
+  "author": "machine_learning_learning",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "npm run build && electron .",
+    "check": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "build": "npm run check && vite build && tsc -p tsconfig.electron.json",
+    "test": "npm run build && node --test tests/*.test.cjs",
+    "pack": "npm run build && node scripts/package.cjs",
+    "pack:dir": "npm run build && node scripts/package.cjs --dir",
+    "test:ui": "npm run build && node tests/ui.cjs",
+    "test:portable": "node tests/portable.cjs"
+  },
+  "dependencies": {
+    "onnxruntime-node": "1.30.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "electron": "44.4.5",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0"
+  },
+  "build": {
+    "appId": "learning.taxi.fare",
+    "productName": "车费预测",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../线性回归/models/lr_torch_1f.onnx",
+        "to": "models/lr_torch_1f.onnx"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "artifactName": "TaxiFare-${version}-win-${arch}.${ext}",
+    "npmRebuild": false
+  }
+}
