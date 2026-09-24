@@ -11,7 +11,7 @@ import onnxruntime as ort
 
 def train(x:torch.Tensor, y:torch.Tensor, loss_fn, plot_df:pd.Series | pd.DataFrame, onnx_path:Path,
           number_epochs = 20, batch_size = 50, learning_rate = 0.001,
-          ) -> torch.nn.Linear:
+          save_onnx=False) -> torch.nn.Linear:
     # 随机种子， 42 是“生命、宇宙以及一切的终极答案”。
     torch.manual_seed(42)
 
@@ -112,23 +112,25 @@ def train(x:torch.Tensor, y:torch.Tensor, loss_fn, plot_df:pd.Series | pd.DataFr
     # 示例输入：一条行程，一个特征（里程），形状为 [1, 1]。
     # 用于确定模型的输入格式，不参与训练，也不限制只能预测 1 英里。
     # 当前没有设置动态形状，导出后每次输入一条行程。
-    example_input = torch.tensor([[1.0]], dtype=torch.float32)
-    # 将计算结构和已训练好的参数保存为 ONNX，默认 export_params=True。
-    # 保存的是预测模型，不包含读取 CSV、训练循环或优化器状态。
-    torch.onnx.export(
 
-        model,                              # 使用刚训练好的模型
-        (example_input, ),                  # 单元素元组，表示模型只有一个输入张量
-        onnx_path,                          # 导出文件路径，同名文件会被覆盖
-        input_names=["TRIP_MILES"],          # 读取模型预测时使用这个输入名
-        output_names=["FARE"],               # 读取模型预测时使用这个输出名
-        dynamo=True,                        # 使用基于 torch.export 的 ONNX 导出方式
-        external_data=False                 # 参数保存在 .onnx 内，不单独生成 .onnx.data
+    if save_onnx:
+        example_input = torch.tensor([[1.0]], dtype=torch.float32)
+        # 将计算结构和已训练好的参数保存为 ONNX，默认 export_params=True。
+        # 保存的是预测模型，不包含读取 CSV、训练循环或优化器状态。
+        torch.onnx.export(
 
-    )
+            model,                              # 使用刚训练好的模型
+            (example_input, ),                  # 单元素元组，表示模型只有一个输入张量
+            onnx_path,                          # 导出文件路径，同名文件会被覆盖
+            input_names=["TRIP_MILES"],          # 读取模型预测时使用这个输入名
+            output_names=["FARE"],               # 读取模型预测时使用这个输出名
+            dynamo=True,                        # 使用基于 torch.export 的 ONNX 导出方式
+            external_data=False                 # 参数保存在 .onnx 内，不单独生成 .onnx.data
+
+        )
 
 
-    # 返回内存中的 PyTorch 模型；ONNX 文件已在上面保存完成。
+    # 返回内存中的 PyTorch 模型；仅当 save_onnx=True 时更新 ONNX 文件。
     return model
 
 
@@ -137,9 +139,9 @@ def predict(onnx_path:Path):
     # 从文件加载模型并创建推理会话，使用 CPU 执行预测，不会重新训练。
     session = ort.InferenceSession(str(onnx_path), providers=['CPUExecutionProvider'])
 
-    # ONNX Runtime 接收 NumPy 数组：3 英里，形状 [1, 1]。
+    # ONNX Runtime 接收 NumPy 数组：14.4 英里，形状 [1, 1]。
     # float32 对应导出时示例输入的 torch.float32。
-    x = np.array([[3.0]], dtype=np.float32)
+    x = np.array([[14.4]], dtype=np.float32)
 
     # 第一个参数指定要取出的输出；字典把输入名映射到实际输入数据。
     # 名字必须与导出时的 input_names、output_names 对应。
@@ -176,7 +178,7 @@ if __name__ == '__main__':
 
     # print(x.shape)
     # print(y.shape)
-    _number_epochs = 20
+    _number_epochs = 60
     _batch_size = 50
     # 学习率
     _learning_rate = 0.001
@@ -189,13 +191,14 @@ if __name__ == '__main__':
     )
 
     # 损失函数：MSE
-    # loss_fn = torch.nn.MSELoss()
+    _loss_fn = torch.nn.MSELoss()
     # MAE：平均绝对误差
+    # _loss_fn = torch.nn.L1Loss()
     # 模型路径以当前脚本所在目录为基准，不受运行时工作目录影响。
     _onnx_path = model_path = Path(__file__).resolve().parent / "models" / "lr_torch_1f.onnx"
     # 自动创建父目录；目录已经存在时也不会报错。
     _onnx_path.parent.mkdir(parents=True, exist_ok=True)
-    _loss_fn = torch.nn.L1Loss()
+
 
     # 直接运行脚本会先训练并导出模型，再读取刚保存的文件进行预测。
     model:torch.nn.Linear = train(
@@ -207,5 +210,6 @@ if __name__ == '__main__':
         _number_epochs,
         _batch_size,
         _learning_rate,
+        save_onnx=True
        )
     predict(_onnx_path)

@@ -87,10 +87,12 @@ RMSE = sqrt(mean((预测值 - 真实值)²))
 该脚本基于单变量线性回归练习，使用里程预测车费，完整流程为：
 
 ```text
-读取 CSV → PyTorch 训练 → 保存 ONNX 文件 → ONNX Runtime 加载 → 预测 3 英里的车费
+读取 CSV → PyTorch 训练 → 保存 ONNX 文件 → ONNX Runtime 加载 → 预测 14.4 英里的车费
 ```
 
-`train()` 使用 `torch.nn.Linear(1, 1)` 和 RMSprop 训练，当前配置为 20 轮、批次大小 50、学习率 0.001、MAE 损失。每轮打印训练集损失和 RMSE，结束后打印权重和偏置，导出模型并返回内存中的 PyTorch 模型。当前脚本不绘图，保留的 `plot_df` 参数没有参与计算。
+`train()` 使用 `torch.nn.Linear(1, 1)` 和 RMSprop 训练，当前主程序配置为 60 轮、批次大小 50、学习率 0.001、MSE 损失。每轮打印训练集损失和 RMSE，结束后打印权重和偏置，并返回内存中的 PyTorch 模型。`save_onnx` 参数默认是 `False`，主程序显式传入 `True`，因此当前直接运行脚本会导出模型。当前脚本不绘图，保留的 `plot_df` 参数没有参与计算。
+
+当前保存模型的权重约为 `2.279238`，偏置约为 `5.020588`，输入 14.4 英里时预测约为 `37.8416` 美元。这是根据全部训练数据拟合的直线结果，不是按里程查找某一条原始记录；相同里程的真实车费可以不同。
 
 ### 保存模型的代码
 
@@ -103,7 +105,7 @@ _onnx_path.parent.mkdir(parents=True, exist_ok=True)
 
 `__file__` 表示当前脚本，`resolve().parent` 得到脚本所在目录。模型保存到本目录的 `models/lr_torch_1f.onnx`，父目录不存在时自动创建。
 
-`train()` 在训练结束后执行以下导出代码：
+`train()` 在训练结束后，仅当 `save_onnx=True` 时执行以下导出代码：
 
 ```python
 model.eval()
@@ -139,7 +141,7 @@ session = ort.InferenceSession(
     providers=["CPUExecutionProvider"],
 )
 
-x = np.array([[3.0]], dtype=np.float32)
+x = np.array([[14.4]], dtype=np.float32)
 outputs = session.run(["FARE"], {"TRIP_MILES": x})
 fare = outputs[0][0, 0]
 print(f"fare {fare:.4f}")
@@ -147,7 +149,7 @@ print(f"fare {fare:.4f}")
 
 `InferenceSession` 从文件加载模型，创建使用 CPU 的推理会话。`session.run()` 将里程交给模型，使用已保存的参数计算车费，不会重新训练。
 
-输入使用 NumPy 数组，类型 `np.float32` 与导出时的 `torch.float32` 对应。当前没有配置动态形状，输入固定为 `[1, 1]`，一次预测一条行程。把 `3.0` 换成其他里程即可预测其他行程。
+输入使用 NumPy 数组，类型 `np.float32` 与导出时的 `torch.float32` 对应。当前没有配置动态形状，输入固定为 `[1, 1]`，一次预测一条行程。把 `14.4` 换成其他里程即可预测其他行程。
 
 `outputs` 是输出列表，`outputs[0]` 取出名为 `FARE` 的数组；该数组形状为 `[1, 1]`，再用 `[0, 0]` 取出第一条行程的预测车费。
 
