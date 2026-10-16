@@ -1,8 +1,8 @@
 # 公平性
 
-本目录收录跟随 Google 机器学习课程编写的收入预测与公平性练习：先训练基础分类模型，按性别比较表现，再使用 MinDiff 尝试缩小两组真实高收入样本的预测差异。
+本目录收录 Google 机器学习课程的收入预测与公平性练习，以及基于课程编写的个人练习。
 
-**运行环境说明：两个 Python 练习均在 macOS（Mac）环境下，使用该环境中的依赖库完成。Windows 环境运行时遇到过依赖库问题，目前尚未完成 Windows 兼容性验证。**
+**运行环境说明：`google_fairness_baseline.py` 和 `google_fairness_mindiff.py` 在 macOS（Mac）环境下，使用该环境中的依赖库完成。它们在 Windows 环境运行时遇到过依赖库问题，目前尚未完成 Windows 兼容性验证。此说明仅针对这两个 Google 练习脚本。**
 
 ## 文件说明
 
@@ -10,10 +10,25 @@
 | --- | --- |
 | [google_fairness_baseline.py](./google_fairness_baseline.py) | 训练基础收入分类模型，执行整体与性别分组评估，生成基础模型报告 |
 | [google_fairness_mindiff.py](./google_fairness_mindiff.py) | 独立训练基础模型，再使用 MinDiff 继续训练，生成基础模型与 MinDiff 报告 |
+| [mlp_torch_11f.py](./mlp_torch_11f.py) | 个人 PyTorch 收入分类练习，包含训练、验证、测试及 ONNX 导出和读取预测代码 |
+| [eval_torch_11f.py](./eval_torch_11f.py) | 独立评估文件的起始模板，目前仅有说明注释 |
+| [models/mlp_torch_11f.onnx](./models/mlp_torch_11f.onnx) | 已导出的收入分类模型，输出 logits |
 | [fairness_report.html](./fairness_report.html) | 基础模型的分组指标与混淆矩阵，支持切换分类阈值 |
 | [min_diff_fairness_report.html](./min_diff_fairness_report.html) | MinDiff 模型的分组指标，支持切换分类阈值 |
 
-原始课程的 Colab 链接保留在两个 Python 文件顶部的注释中。
+原始课程的 Colab 链接保留在两个 `google_fairness_*.py` 文件顶部的注释中。
+
+## 个人 PyTorch 练习
+
+`mlp_torch_11f.py` 参考 `google_fairness_baseline.py`，使用 PyTorch 实现 `11 → 64 → 32 → 1` 的二分类网络。文件名中的 `mlp` 表示多层感知机，`torch` 表示 PyTorch，`11f` 表示 11 个输入特征。
+
+代码按标签分层划分 80% 训练集、10% 验证集和 10% 测试集；验证集、测试集复用训练集的均值和标准差。训练采用 BCE with Logits、Adam（学习率 `0.001`）、批大小 `100` 和 `10` 轮训练，并计算整体 Loss、Accuracy 和 AUC。尚未实现性别分组评估和可视化。
+
+当前训练、ONNX 导出及 PyTorch 测试调用已注释，直接运行会加载已有 ONNX，预测测试集前两条样本并打印高收入概率。当前模型导出时没有设置动态批大小，示例输入为 `(2, 11)`。模型不包含标准化，脚本通过相同的数据及划分重新计算训练集的均值、标准差；这些参数和特征顺序尚未单独保存。
+
+该个人练习已在 Windows 的 CUDA 环境运行，ONNX 加载代码指定 `CUDAExecutionProvider`，需要 ONNX Runtime 的对应 GPU 支持。使用已有的 Anaconda `machine_learning` 环境，本地数据集统一放在根目录 `data` 文件夹。`eval_torch_11f.py` 目前仍为注释模板，读取预测逻辑位于训练文件内。
+
+下文的数据处理、模型结构、报告及运行说明均针对现有的两个 Google 练习脚本。
 
 ## 数据与预测任务
 
