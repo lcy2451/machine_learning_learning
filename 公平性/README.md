@@ -2,6 +2,8 @@
 
 本目录收录跟随 Google 机器学习课程编写的收入预测与公平性练习：先训练基础分类模型，按性别比较表现，再使用 MinDiff 尝试缩小两组真实高收入样本的预测差异。
 
+**运行环境说明：两个 Python 练习均在 macOS（Mac）环境下，使用该环境中的依赖库完成。Windows 环境运行时遇到过依赖库问题，目前尚未完成 Windows 兼容性验证。**
+
 ## 文件说明
 
 | 文件 | 内容 |
@@ -72,7 +74,7 @@
 
 ## 运行方式
 
-在仓库根目录使用已有的 Anaconda `machine_learning` 环境：
+以下命令用于 macOS 环境。在仓库根目录使用已有的 Anaconda `machine_learning` 环境，并确保其中具备下文列出的依赖：
 
 ```shell
 conda activate machine_learning
