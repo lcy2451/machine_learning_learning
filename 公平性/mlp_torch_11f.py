@@ -80,16 +80,9 @@ def train(train_loader:DataLoader,
         # 模型切换到训练
         model.train()
         for x_batch, y_batch in train_loader:
-            #
-            # x_batch = x_batch.to(device)
-            # y_batch = y_batch.to(device)
 
             # 1. 前向传播
             _logits = model(x_batch)
-
-            # # 测试前向传播
-            # with torch.no_grad():
-            #     output = _model(_normalize[:5])
 
             # 2. 计算 Loss
             loss = loss_fn(_logits, y_batch)
@@ -115,8 +108,6 @@ def train(train_loader:DataLoader,
 
             epoch_loss = 0
             for val_x_batch, val_y_batch in val_loader:
-                # val_x_batch = val_x_batch.to(device)
-                # val_y_batch = val_y_batch.to(device)
 
                 # 用验证集验证
                 predictions = model(val_x_batch)
@@ -255,43 +246,56 @@ if __name__ == '__main__':
 
     # 模型路径以当前脚本所在目录为基准，不受运行时工作目录影响。
     _onnx_path = model_path = Path(__file__).resolve().parent / "models" / "mlp_torch_11f.onnx"
+    _pt_path = _onnx_path.with_suffix(".pt")
     _onnx_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # train(train_loader=_train_loader, val_loader=_val_loader,
-    #       model=_model, loss_fn=_loss_fn, optimizer=_optimizer,
-    #       accuracy=_accuracy, auc=_auc, epochs=_epochs)
+    train(train_loader=_train_loader, val_loader=_val_loader,
+          model=_model, loss_fn=_loss_fn, optimizer=_optimizer,
+          accuracy=_accuracy, auc=_auc, epochs=_epochs)
+
+    torch.onnx.export(
+        _model,
+        (test_normalize[:1],),
+        _onnx_path,
+        input_names=[ "features"],
+        output_names=["logits"],
+        dynamo=True,
+        external_data=False
+
+    )
+
+    torch.save(
+        {
+            "model_state_dict": _model.state_dict(),
+            "optimizer_state_dict": _optimizer.state_dict(),
+            "mean": _mean.detach().cpu(),
+            "std": _std.detach().cpu(),
+            "feature_names": _train_df.drop(columns=[_LABEL_KEY]).columns.to_list(),
+            "epochs": _epochs,
+        },
+        _pt_path,
+    )
+
+    # session = ort.InferenceSession(str(_onnx_path), providers=["CPUExecutionProvider"])
     #
-    # torch.onnx.export(
-    #     _model,
-    #     (test_normalize[:1],),
-    #     _onnx_path,
-    #     input_names=[ "features"],
-    #     output_names=["logits"],
-    #     dynamo=True,
-    #     external_data=False
+    # for i, (_test, _label) in enumerate(zip(test_normalize[:50], _test_y), start=1):
+    #     onnx_logits = session.run(
+    #         ["logits"],# 要获取名为 logits 的输出 这是模型导出时定义的
+    #         {"features":# 模型输入的名称
+    #              _test.unsqueeze(0).detach().cpu().numpy()}
+    #     )[0]
     #
-    # )
-
-    session = ort.InferenceSession(str(_onnx_path), providers=["CPUExecutionProvider"])
-
-    for i, (_test, _label) in enumerate(zip(test_normalize[:50], _test_y), start=1):
-        onnx_logits = session.run(
-            ["logits"],# 要获取名为 logits 的输出 这是模型导出时定义的
-            {"features":# 模型输入的名称
-                 _test.unsqueeze(0).detach().cpu().numpy()}
-        )[0]
-
-        # logits 转为预测概率
-        probability = torch.from_numpy(onnx_logits).sigmoid()
-
-        # for probability in probabilities.flatten():
-        # _label = True if _label[0] else False
-        # print(f"第 i 条：年收入超过 50,000 美元的预测概率为 {probability.item():.2%} {_label}")
-        predicted = int(probability.item() >= 0.5)
-        actual = int(_label.item())
-        result = "正确" if predicted == actual else "错误"
-
-        print(
-            f"第 {i} 条：概率 {probability.item():.2%}，"
-            f"预测 {predicted}，真实 {actual}，{result}"
-        )
+    #     # logits 转为预测概率
+    #     probability = torch.from_numpy(onnx_logits).sigmoid()
+    #
+    #     # for probability in probabilities.flatten():
+    #     # _label = True if _label[0] else False
+    #     # print(f"第 i 条：年收入超过 50,000 美元的预测概率为 {probability.item():.2%} {_label}")
+    #     predicted = int(probability.item() >= 0.5)
+    #     actual = int(_label.item())
+    #     result = "正确" if predicted == actual else "错误"
+    #
+    #     print(
+    #         f"第 {i} 条：概率 {probability.item():.2%}，"
+    #         f"预测 {predicted}，真实 {actual}，{result}"
+    #     )
