@@ -24,9 +24,13 @@
 
 代码按标签分层划分 80% 训练集、10% 验证集和 10% 测试集；验证集、测试集复用训练集的均值和标准差。训练采用 BCE with Logits、Adam（学习率 `0.001`）、批大小 `100` 和 `10` 轮训练，并计算整体 Loss、Accuracy 和 AUC。尚未实现性别分组评估和可视化。
 
-当前训练、ONNX 导出及 PyTorch 测试调用已注释，直接运行会加载已有 ONNX，预测测试集前两条样本并打印高收入概率。当前模型导出时没有设置动态批大小，示例输入为 `(2, 11)`。模型不包含标准化，脚本通过相同的数据及划分重新计算训练集的均值、标准差；这些参数和特征顺序尚未单独保存。
+当前训练和 ONNX 导出调用已注释，直接运行会加载已有 ONNX，逐条预测测试集前 50 条样本，打印高收入概率、预测类别、真实标签及判断是否正确。当前模型导出时没有设置动态批大小，输入固定为 `(1, 11)`。模型不包含标准化，脚本通过相同的数据及划分重新计算训练集的均值、标准差；这些参数和特征顺序尚未单独保存。
 
-该个人练习已在 Windows 的 CUDA 环境运行，ONNX 加载代码指定 `CUDAExecutionProvider`，需要 ONNX Runtime 的对应 GPU 支持。使用已有的 Anaconda `machine_learning` 环境，本地数据集统一放在根目录 `data` 文件夹。`eval_torch_11f.py` 目前仍为注释模板，读取预测逻辑位于训练文件内。
+训练代码优先使用 CUDA，CUDA 不可用时回退到 CPU；模型、数据和评估指标放在同一设备上。已在 Windows、NVIDIA GeForce RTX 4060 Laptop GPU 上完成训练。
+
+ONNX 预测设备由 ONNX Runtime 的 `providers` 单独指定，与 PyTorch 训练设备分开配置。当前加载代码使用 `CPUExecutionProvider` 在 CPU 上预测；如改用 `CUDAExecutionProvider`，需要 ONNX Runtime 的对应 GPU 依赖，当前 Windows 环境曾遇到 CUDA 执行提供程序加载失败的问题。
+
+开发时使用本机 Anaconda 的 `machine_learning` 环境，该环境不包含在仓库中。运行个人 PyTorch 练习需自行准备兼容的 Python 环境及 pandas、PyTorch、TorchMetrics、scikit-learn 和 ONNX Runtime 等依赖；重新导出 ONNX 还需相应的导出依赖。本地数据集统一放在根目录 `data` 文件夹。`eval_torch_11f.py` 目前仍为注释模板，读取预测逻辑位于训练文件内。
 
 下文的数据处理、模型结构、报告及运行说明均针对现有的两个 Google 练习脚本。
 
@@ -89,7 +93,9 @@
 
 ## 运行方式
 
-以下命令用于 macOS 环境。在仓库根目录使用已有的 Anaconda `machine_learning` 环境，并确保其中具备下文列出的依赖：
+以下命令用于运行两个 Google 练习脚本，已运行的环境为 macOS。仓库不包含开发者本机的 Conda 环境，目前也未提供可直接复现 Python 环境的配置文件。运行前需自行准备兼容的 Python 环境及下文列出的依赖。
+
+在仓库根目录执行。下面的 `machine_learning` 仅为开发者本机的环境名，请替换为自己已配置好的 Conda 环境名；如果使用其他环境管理方式，先按对应方式激活环境，再执行 Python 命令：
 
 ```shell
 conda activate machine_learning

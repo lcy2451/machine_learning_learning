@@ -252,17 +252,18 @@ if __name__ == '__main__':
     _test_dataset = TensorDataset(test_normalize, _test_y)
     _test_loader = DataLoader(_test_dataset, batch_size=_batch_size, shuffle=False)
 
-    # train(train_loader=_train_loader, val_loader=_val_loader,
-    #       model=_model, loss_fn=_loss_fn, optimizer=_optimizer,
-    #       accuracy=_accuracy, auc=_auc, epochs=_epochs)
 
     # 模型路径以当前脚本所在目录为基准，不受运行时工作目录影响。
     _onnx_path = model_path = Path(__file__).resolve().parent / "models" / "mlp_torch_11f.onnx"
     _onnx_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # train(train_loader=_train_loader, val_loader=_val_loader,
+    #       model=_model, loss_fn=_loss_fn, optimizer=_optimizer,
+    #       accuracy=_accuracy, auc=_auc, epochs=_epochs)
+    #
     # torch.onnx.export(
     #     _model,
-    #     (test_normalize[:2],),
+    #     (test_normalize[:1],),
     #     _onnx_path,
     #     input_names=[ "features"],
     #     output_names=["logits"],
@@ -271,16 +272,26 @@ if __name__ == '__main__':
     #
     # )
 
-    session = ort.InferenceSession(str(_onnx_path), providers=["CUDAExecutionProvider"])
+    session = ort.InferenceSession(str(_onnx_path), providers=["CPUExecutionProvider"])
 
-    onnx_logits = session.run(
-        ["logits"],
-        {"features": test_normalize[:2].detach().cpu().numpy()}
-    )[0]
-    print(onnx_logits)
+    for i, (_test, _label) in enumerate(zip(test_normalize[:50], _test_y), start=1):
+        onnx_logits = session.run(
+            ["logits"],# 要获取名为 logits 的输出 这是模型导出时定义的
+            {"features":# 模型输入的名称
+                 _test.unsqueeze(0).detach().cpu().numpy()}
+        )[0]
 
-    # logits 转为预测概率
-    probabilities = torch.from_numpy(onnx_logits).sigmoid()
+        # logits 转为预测概率
+        probability = torch.from_numpy(onnx_logits).sigmoid()
 
-    for i, probability in enumerate(probabilities.flatten(), start=1):
-        print(f"第 {i} 条：年收入超过 50,000 美元的预测概率为 {probability.item():.2%}")
+        # for probability in probabilities.flatten():
+        # _label = True if _label[0] else False
+        # print(f"第 i 条：年收入超过 50,000 美元的预测概率为 {probability.item():.2%} {_label}")
+        predicted = int(probability.item() >= 0.5)
+        actual = int(_label.item())
+        result = "正确" if predicted == actual else "错误"
+
+        print(
+            f"第 {i} 条：概率 {probability.item():.2%}，"
+            f"预测 {predicted}，真实 {actual}，{result}"
+        )

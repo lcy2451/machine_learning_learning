@@ -10,7 +10,7 @@
 
 ## 开发环境
 
-以下为 Python 机器学习练习环境；桌面 App 使用独立的 Node.js/npm 项目，见下方介绍。
+以下记录开发者本机的 Python 机器学习练习环境。`machine_learning` 是本机的 Conda 环境名，该环境不包含在仓库中；仓库目前未提供可直接复现 Python 环境的配置文件。运行各练习前需自行准备兼容的 Python 环境及相应依赖，环境名可自行选择。桌面 App 使用独立的 Node.js/npm 项目，见下方介绍。
 
 - 操作系统：Windows
 - Python 发行版与环境管理：Anaconda / Conda
