@@ -1,5 +1,10 @@
 # 机器学习学习与实践
 
+![Python 3.13](https://img.shields.io/badge/Python-3.13%2B-3776AB?logo=python&logoColor=white)
+[![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
+[![CUDA](https://img.shields.io/badge/CUDA-76B900?logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-zone)
+
 个人机器学习学习仓库，用于整理学习笔记、算法实现和练习代码。
 
 ## 内容入口
