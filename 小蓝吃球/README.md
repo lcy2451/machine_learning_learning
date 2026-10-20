@@ -75,7 +75,7 @@ $y$ 是预测毒性。
 
 
 
-输入按 $x_1 = \frac{x - \mathrm{mean}}{\mathrm{std}}$ 标准化，其中 $\mathrm{mean}$ 是输入数据的平均值，$\mathrm{std}$ 是标准差。
+输入按 $x_1 = \frac{x - \mathrm{mean}}{\mathrm{std}}$ 标准化，其中 $\mathrm{mean}$ 是输入数据的平均值， $\mathrm{std}$  是标准差。
 
 因此，代码打印的权重和偏置对应标准化后的输入；
 
