@@ -65,6 +65,7 @@ if __name__ == "__main__":
 
     _model = torch.nn.Linear(in_features=1, out_features=1)
 
+    # torch.nn.MSELoss() 本身是一个“损失函数模块 / 损失函数形式”；当它把一批或整个训练集的误差聚合成一个标量、作为优化器要最小化的目标时，这个标量目标可以叫“代价函数”。
     _loss_fn = torch.nn.MSELoss()
     train(train_loader=x_dataloader, model=_model, loss_fn=_loss_fn, epochs=_epochs, learning_rate=_learning_rate)
 
