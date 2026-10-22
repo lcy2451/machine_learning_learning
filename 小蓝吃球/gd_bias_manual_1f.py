@@ -32,15 +32,15 @@ for _ in range(100):
 
         b = b - _learning_rate * db
 
-        plt.clf() # 清空窗口
-        plt.xlim(0, 1)
-        plt.ylim(0, 1.2)
+    plt.clf() # 清空窗口
+    plt.xlim(0, 1)
+    plt.ylim(0, 1.2)
 
-        plt.scatter(xs, ys)
-        y_pre = w * xs + b
+    plt.scatter(xs, ys)
+    y_pre = w * xs + b
 
-        plt.plot(xs, y_pre)
-        plt.pause(0.01)  # 暂停 0.01s
+    plt.plot(xs, y_pre)
+    plt.pause(0.01)  # 暂停 0.01s
 
 # plt.scatter(xs, ys)
 # plt.show()  # 训练结束后保留窗口
