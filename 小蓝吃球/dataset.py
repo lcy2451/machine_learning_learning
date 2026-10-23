@@ -36,3 +36,11 @@ def get_beans4(counts):
 
 	return xs,ys
 
+def get_beans5(counts):
+	xs = np.random.rand(counts,2)*2
+	ys = np.zeros(counts)
+	for i in range(counts):
+		x = xs[i]
+		if (x[0]-0.5*x[1]-0.1)>0:
+			ys[i] = 1
+	return xs,ys
