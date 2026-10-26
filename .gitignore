@@ -4,3 +4,12 @@
 
 # Excel 临时锁定文件
 ~$*.xlsx
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 本地数据文件及自动下载的 MNIST 数据
+/data/acsincome_raw_2018.xlsx
+/data/mnist/
+/卷积/data/
