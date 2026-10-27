@@ -10,6 +10,18 @@
 
 ## 当前内容
 
-目前仅建立目录和来源说明，尚无卷积代码或实验结果。
+目录包含 MNIST 全连接分类练习（`mnist_keras_784f.py`、`mnist_torch_784f.py`），以及 LeNet-5 相关练习（`lenet5_keras.py`、`lenet5_torch.py`）。两个卷积练习均包含 MNIST 训练和测试集评估，但结构存在差异。
+
+## LeNet-5 版本说明
+
+本目录的 LeNet-5 练习以教程简化版为参考，并非 1998 年论文原版的严格复现。
+
+当前 Keras 教程版使用 28×28 灰度输入、两个 5×5 卷积层（6、16 通道）、普通平均池化、ReLU，以及 120、84 个单元的全连接隐藏层，最后用 Softmax 和交叉熵完成十分类。
+
+当前 PyTorch 版使用相同输入尺寸和卷积通道数，卷积核为 3×3，全连接隐藏层为 128、64 个单元，输出原始分数并搭配 `CrossEntropyLoss`；支持 CUDA、权重衰减、逐轮测试指标和总耗时统计。因此，两版结果不宜直接作为框架性能对比。
+
+论文原版使用 32×32 输入、缩放 Tanh、带可训练参数的下采样、C3 层的部分通道连接、120 通道的 C5 卷积层和 RBF 输出层。因此，仅保留相近的层数和通道数，并不代表精确复现原版。
+
+参考：[LeNet-5 原论文《Gradient-Based Learning Applied to Document Recognition》](https://bottou.org/papers/lecun-98h)。
 
 本地数据集统一存放在仓库根目录的 [data](../data/README.md) 文件夹。
