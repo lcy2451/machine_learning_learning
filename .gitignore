@@ -13,3 +13,6 @@ __pycache__/
 /data/acsincome_raw_2018.xlsx
 /data/mnist/
 /卷积/data/
+
+# 已移除车费应用遗留的本地依赖和构建产物
+/taxi-app/
