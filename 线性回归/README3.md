@@ -17,6 +17,11 @@
 
 我们把这些数据读取并绘制在图表上
 ```python
+import os
+# 本机 OpenMP 重复加载问题的临时绕过设置，并未消除底层运行库冲突
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -53,19 +58,17 @@ plt.title("行驶里程与车费", fontsize=14)  # 设置图像名称
 plt.xlabel("行程里程")  # 设置横坐标的名称
 plt.ylabel("车费")  # 设置纵坐标的名称
 
-# w = 1.2633912772426041
-# y_pre = w * xs
 
-plt.plot(_x, y_pre, color="red")
 plt.scatter(_x, _y, s=10, alpha=0.3)
 plt.show()
-
 ```
 ![alt text](./images/data-points.png)
+
 从散点图可以看出，行驶里程越远，车费总体上越高，两者呈现明显的正相关关系。虽然部分数据点偏离了整体趋势，这里仍仅使用行驶里程作为输入特征，学习它与车费之间的线性关系。
 
 为了拟合行驶里程与车费之间的关系，我们希望找到一条能够反映数据整体趋势、使预测误差尽可能小的直线：
 ![alt text](./images/points-with-model.png)
+
 直线可以用公式 车费 = 权重 × 行驶里程 + 偏置 表示。但我们还不知道权重和偏置应该是多少，因此需要创建一个线性回归模型来表示这个关系，再通过训练从数据中学习这两个参数。
 
 这里使用行驶里程预测车费，所以模型只有 1 个输入特征和 1 个输出值：
@@ -202,6 +205,10 @@ for epoch in range(epochs):
 下面将数据读取、模型创建、训练和拟合线绘制组合起来。运行代码后，可以看到每轮训练的平均损失，以及最终的拟合直线。
 ```python
 # 本例在 Python 3.13 环境下测试，使用 PyTorch 进行模型训练，pandas 读取数据，Matplotlib 绘制图表。
+import os
+# 本机 OpenMP 重复加载问题的临时绕过设置，并未消除底层运行库冲突
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import torch
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -323,4 +330,6 @@ plt.show()
 
 ```
 
-模型已经学习到了行驶里程与车费之间的整体关系，但部分样本的预测仍存在较大误差。本例只使用行驶里程作为输入，能够提供的信息有限。后续将加入行程时长等特征，观察多个输入能否改善拟合效果。
+模型已经学习到了行驶里程与车费之间的整体关系，但部分样本的预测仍存在较大误差。
+
+

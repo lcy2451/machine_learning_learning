@@ -1,5 +1,8 @@
 # 使用 芝加哥出租车数据，学习行程里程与车费之间的线性关系。
 # pandas 负责读取数据，PyTorch 负责训练，Matplotlib 负责绘制结果。
+import os
+# 本机 OpenMP 重复加载问题的临时绕过设置，并未消除底层运行库冲突
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 from pathlib import Path
 
