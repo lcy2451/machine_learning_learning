@@ -6,61 +6,11 @@
 
 | 文件 | 实现库 | 输入特征数量 | 输入特征 | 预测目标 |
 | --- | --- | --- | --- | --- |
-| [lr_torch_1f.py](./lr_torch_1f.py) | PyTorch（torch） | 1（单变量） | 行程里程 `TRIP_MILES` | 车费 `FARE` |
 | [lr_torch_2f.py](./lr_torch_2f.py) | PyTorch（torch） | 2（多变量） | 里程 `TRIP_MILES`、时长 `TRIP_SECONDS` | 车费 `FARE` |
 | [lr_torch_3f.py](./lr_torch_3f.py) | PyTorch（torch） | 当前为 2 | 里程 `TRIP_MILES`、时长 `TRIP_SECONDS`；公司列已预处理但未加入输入 | 车费 `FARE` |
 | [lr_torch_1f_onnx.py](./lr_torch_1f_onnx.py) | PyTorch 训练与导出、ONNX Runtime 预测 | 1（单变量） | 行程里程 `TRIP_MILES` | 车费 `FARE` |
 
-文件名 `lr_torch_1f.py` 中，`lr` 表示线性回归，`torch` 表示 PyTorch，`1f` 表示 1 个输入特征。
-
 `lr_torch_3f.py` 保留公司字段实验的文件名，当前实际输入数量以代码中的 `_in_feature_names` 为准，不能仅根据文件名判断。
-
-导出的模型文件为 [models/lr_torch_1f.onnx](./models/lr_torch_1f.onnx)，由 `lr_torch_1f_onnx.py` 保存和读取，不是单独的 Python 脚本。
-
-## lr_torch_1f.py：PyTorch 单变量线性回归
-
-使用 [芝加哥出租车数据](../data/chicago_taxi_train.csv)，学习行程里程与车费之间的线性关系。pandas 负责读取数据，PyTorch 负责训练，Matplotlib 负责绘制结果。
-
-模型由 `torch.nn.Linear(1, 1)` 定义：
-
-```text
-预测车费 = 权重 × 行程里程 + 偏置
-```
-
-### 训练方式
-
-`train()` 接收输入张量、目标张量、损失函数、绘图数据以及训练轮数、批次大小和学习率。通过 `TensorDataset` 和 `DataLoader` 将数据分批并打乱顺序，使用反向传播与 RMSprop 优化器更新模型参数。
-
-| 配置 | 当前值 |
-| --- | --- |
-| 训练轮数 | 20 |
-| 批次大小 | 50 |
-| 学习率 | 0.001 |
-| 随机种子 | 42 |
-| 优化器 | RMSprop |
-| 当前损失函数 | `torch.nn.L1Loss()`（MAE） |
-
-目前支持 `L1Loss()`（平均绝对误差）和 `MSELoss()`（均方误差），均使用默认的均值归约方式。损失函数从外部传入，训练时使用所选损失计算梯度，每轮结束后在整个训练集上计算损失和 RMSE。
-
-RMSE 的定义为：
-
-```text
-RMSE = sqrt(mean((预测值 - 真实值)²))
-```
-
-使用 MSE 时，对训练集 MSE 开平方即可得到 RMSE；使用 MAE 时，另行根据预测误差计算 RMSE。
-
-### 结果展示
-
-脚本输出每轮损失、RMSE 以及模型权重和偏置，并绘制三张图：
-
-- **训练损失**：展示所选损失随训练轮数的变化，纵轴随损失函数显示 MAE 或 MSE。
-- **训练集 RMSE**：展示预测误差随训练轮数的变化，与车费使用相同单位。
-- **拟合结果**：抽取最多 200 条样本绘制实际车费散点，在全部训练数据的里程范围内绘制预测直线，并用红色五角星标出 1 英里的预测车费。
-
-当前代码使用全部数据训练和计算指标，没有单独划分测试集，因此图中反映的是训练集上的拟合表现。
-
-数据文件通过 `../data/chicago_taxi_train.csv` 读取，运行时的工作目录需要设为本目录（`线性回归`）。
 
 ## lr_torch_2f.py：PyTorch 双变量线性回归
 
