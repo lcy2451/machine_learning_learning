@@ -52,20 +52,22 @@ def train(
             with torch.no_grad():
                 epoch_loss = 0
 
-                if not val_load:
-                     val_load = train_load
-
                 for val_x_batch, val_y_batch in val_load:
                      # 用验证集验证
                     predictions = model(val_x_batch)
 
                     batch_loss = loss_fn(predictions, val_y_batch)
-                    epoch_loss += batch_loss.item()
+                    if loss_fn.reduction == "mean":
+                        epoch_loss += batch_loss.item() * len(val_x_batch)
+                    else:
+                        epoch_loss += batch_loss.item()
+                    
 
                     # 更新指标
                     targets = val_y_batch.flatten()
                     accuracy.update(predictions.flatten(), targets)
 
+                    
             epoch_loss = epoch_loss / len(val_load.dataset)
             
             # 汇总整个验证集的指标
@@ -74,8 +76,8 @@ def train(
             print(f"epoch: {epoch+1}/{epochs}, val loss: {epoch_loss:.4f},"
                   f" MAE: {epoch_accuracy:.4f}")
 
-    weight = model.weight.item()
-    bais = model.bias.item()
+    # weight = model.weight.item()
+    # bais = model.bias.item()
 
-    print("weight: ", f"{weight:.4f}")
-    print("bias: ", f"{bais:.4f}")
+    # print("weight: ", f"{weight:.4f}")
+    # print("bias: ", f"{bais:.4f}")
