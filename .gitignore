@@ -13,6 +13,10 @@ __pycache__/
 *.onnx
 *.onnx.data
 
+# 公平性实验生成的 HTML 报告
+/公平性/fairness_report.html
+/公平性/min_diff_fairness_report.html
+
 # 本地数据文件及自动下载的 MNIST 数据
 /data/acsincome_raw_2018.xlsx
 /data/mnist/
