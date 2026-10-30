@@ -9,6 +9,10 @@
 __pycache__/
 *.pyc
 
+# 训练生成的 ONNX 模型及外部权重
+*.onnx
+*.onnx.data
+
 # 本地数据文件及自动下载的 MNIST 数据
 /data/acsincome_raw_2018.xlsx
 /data/mnist/

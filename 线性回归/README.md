@@ -1,36 +1,678 @@
 # 线性回归
 
-本目录收录基于 PyTorch 的线性回归练习，包括单变量、多变量、公司字段编码实验，以及 ONNX 模型导出与读取预测。
+本目录包含以下 PyTorch 练习：
 
-## 代码说明
+- [lr_torch_1f.py](./lr_torch_1f.py)：使用行程里程预测车费。
+- [lr_torch_2f.py](./lr_torch_2f.py)：使用行程里程和行程分钟数预测车费，训练前对输入进行标准化。
+- [train_utils.py](./train_utils.py)：上述两个脚本使用的训练函数。
+- [lr_torch_1f_onnx.py](./lr_torch_1f_onnx.py)：单特征模型训练、ONNX 导出与读取预测。
 
-| 文件 | 实现库 | 输入特征数量 | 输入特征 | 预测目标 |
-| --- | --- | --- | --- | --- |
-| [lr_torch_2f.py](./lr_torch_2f.py) | PyTorch（torch） | 2（多变量） | 里程 `TRIP_MILES`、时长 `TRIP_SECONDS` | 车费 `FARE` |
-| [lr_torch_3f.py](./lr_torch_3f.py) | PyTorch（torch） | 当前为 2 | 里程 `TRIP_MILES`、时长 `TRIP_SECONDS`；公司列已预处理但未加入输入 | 车费 `FARE` |
-| [lr_torch_1f_onnx.py](./lr_torch_1f_onnx.py) | PyTorch 训练与导出、ONNX Runtime 预测 | 1（单变量） | 行程里程 `TRIP_MILES` | 车费 `FARE` |
+下面按单特征到双特征的顺序介绍线性回归。文中的双特征示例仅将秒转换为分钟；`lr_torch_2f.py` 还会进行标准化，并训练 50 轮。
 
-`lr_torch_3f.py` 保留公司字段实验的文件名，当前实际输入数量以代码中的 `_in_feature_names` 为准，不能仅根据文件名判断。
+线性回归是一种用于查找变量之间关系的统计技术。在机器学习背景下，线性回归用于查找特征与标签之间的关系。
 
-## lr_torch_2f.py：PyTorch 双变量线性回归
+以下这个例子是用行驶里程预测芝加哥出租车费 数据来自 [芝加哥市出租车行程数据集](https://www.google.com/url?q=https%3A%2F%2Fdata.cityofchicago.org%2FTransportation%2FTaxi-Trips%2Fwrvz-psew) 
 
-使用行程里程 `TRIP_MILES` 和行程时长 `TRIP_SECONDS` 共同预测车费 `FARE`。输入每行按 `[里程, 时长]` 排列，形状为 `[样本数, 2]`；模型为 `torch.nn.Linear(2, 1)`，包含两个权重和一个偏置：
 
-```text
-预测车费 = 里程权重 × 里程 + 时长权重 × 时长 + 偏置
+
+| - - - - - - - - 行驶里程（英里） - - - - - - - - | - - - - - - - - 车费 - - - - - - - - |
+| ---- | --- |
+|  2.57    |  31.99   |
+|    1.18  |     9.75 |
+| 1.29     |  10.25   |
+| 3.7      |  23.75   |
+| 1.15     |  10      |
+| 1.38     |  11      |
+| 2        | 14.5     |
+|...       |...       |
+
+我们把这些数据读取并绘制在图表上
+```python
+import os
+# 本机 OpenMP 重复加载问题的临时绕过设置，并未消除底层运行库冲突
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+import torch
+import pandas as pd
+import matplotlib.pyplot as plt
+
+chicago_taxi_dataset = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/chicago_taxi_train.csv")
+
+# TRIP_MILES  行程里程
+# TRIP_SECONDS 行程时长（秒）
+# FARE 票价
+# COMPANY  公司
+# PAYMENT_TYPE  支付方式
+# TIP_RATE 小费
+_training_df:pd.Series | pd.DataFrame = chicago_taxi_dataset.loc[
+    :, ('TRIP_MILES', 'TRIP_SECONDS', 'FARE', 'COMPANY', 'PAYMENT_TYPE', 'TIP_RATE')]
+
+# 把 Pandas 数据转换成 PyTorch 的 Tensor（张量）。
+# 输入特征 X：行程里程
+_x:torch.Tensor = torch.tensor(_training_df[['TRIP_MILES']].values, dtype=torch.float)
+# 真实标签 y：车费
+_y:torch.Tensor = torch.tensor(_training_df[['FARE']].values, dtype=torch.float)
+
+ # 按顺序查找可用字体，兼容 macOS 和 Windows
+plt.rcParams["font.sans-serif"] = [
+    "Microsoft YaHei",  # Windows：微软雅黑
+    "PingFang SC",      # macOS：苹方
+    "Heiti SC",         # macOS：黑体
+    "SimHei",          # Windows：黑体
+    "DejaVu Sans",
+]
+
+# 避免部分中文字体无法显示负号
+plt.rcParams["axes.unicode_minus"] = False
+    # 配置图像
+plt.title("行驶里程与车费", fontsize=14)  # 设置图像名称
+plt.xlabel("行程里程")  # 设置横坐标的名称
+plt.ylabel("车费")  # 设置纵坐标的名称
+
+
+plt.scatter(_x, _y, s=10, alpha=0.3)
+plt.show()
+```
+![alt text](./images/data-points.png)
+
+从散点图可以看出，行驶里程越远，车费总体上越高，两者呈现明显的正相关关系。虽然部分数据点偏离了整体趋势，这里仍仅使用行驶里程作为输入特征，学习它与车费之间的线性关系。
+
+为了拟合行驶里程与车费之间的关系，我们希望找到一条能够反映数据整体趋势、使预测误差尽可能小的直线：
+![alt text](./images/points-with-model.png)
+
+直线可以用公式 车费 = 权重 × 行驶里程 + 偏置 表示。但我们还不知道权重和偏置应该是多少，因此需要创建一个线性回归模型来表示这个关系，再通过训练从数据中学习这两个参数。
+
+这里使用行驶里程预测车费，所以模型只有 1 个输入特征和 1 个输出值：
+```Python
+import torch
+model = torch.nn.Linear(in_features=1, out_features=1)
 ```
 
-模型在主程序中创建并传给 `train()`。当前使用 RMSprop、MAE 损失，训练 60 轮，批次大小为 50，学习率为 0.001。每轮计算整个训练集的损失和 RMSE，训练结束后打印两个权重和偏置。
+#### 损失函数
+在训练过程中，怎么判断这条线拟合得好不好？
 
-结果展示包括三张图：
+我们可以使用损失函数，用一个数值衡量预测车费与真实车费之间的差距。损失越小，说明模型在这个指标下拟合得越好。
 
-- 训练损失曲线。
-- 训练集 RMSE 曲线。
-- 三维真实行程散点和模型预测平面，三个坐标分别为里程、时长和车费。
+线性回归中常见的损失和误差指标包括：`L1 loss`、`平均绝对误差（MAE`）、`L2 loss、均方误差（MSE）`和`均方根误差（RMSE)`。
 
-三维散点从训练张量中随机抽取最多 200 条真实行程。预测平面在里程和时长的范围内各取 20 个值，组合成 400 组输入后进行预测；网格组合用于展示模型平面，不代表每组组合都对应真实行程。
+这里使用 `L1 loss`，将预测车费与真实车费之差的绝对值相加：
 
-该脚本使用全部数据训练和计算指标，不导出模型。数据路径同样为 `../data/chicago_taxi_train.csv`，运行时工作目录需设为 `线性回归`。
+```python
+# L1 loss：绝对误差之和
+loss_fn = torch.nn.L1Loss(reduction="sum")
+```
+
+#### 梯度下降法
+有了损失函数，我们就能衡量模型的预测效果。但怎样调整权重和偏置，才能让损失减小呢？
+
+梯度下降是一种通过反复调整模型参数，寻找较小损失的方法。梯度指向损失增大最快的方向，因此我们沿着梯度的反方向，小步更新参数。学习率控制每次更新的步幅。
+
+模型先初始化权重和偏置，再重复以下步骤：
+1. 使用当前权重和偏置计算预测值，并计算损失。
+2. 计算损失对权重和偏置的梯度。
+3. 根据梯度和学习率，沿着降低损失的方向更新参数。
+4. 重复以上过程，直到达到设定的训练轮数，或满足提前停止条件。
+
+#### 超参数
+超参数是控制训练各个方面的变量。三个常见的超参数是：
+- Learning rate  学习率
+- Batch size  批量大小
+- Epochs  训练轮数
+```python
+# 训练轮数
+epochs = 20
+# 批量大小
+batch_size = 50
+# 学习率
+learning_rate = 0.001
+```
+#### Learning rate  学习率
+**学习率（Learning rate）** 是控制每次参数更新步幅的超参数，会影响模型的收敛速度和训练稳定性。学习率太小，参数更新缓慢，可能需要更长时间才能收敛；学习率太大，可能反复越过损失较小的位置，导致损失震荡，甚至发散。选择合适的学习率，有助于模型更快、更稳定地降低损失。
+
+#### Batch size  批量大小
+批量大小（Batch size）指的是每次更新模型参数时使用的数据量。例如，批量大小为 50，就是每次用 50 个样本计算损失和梯度，然后更新一次权重和偏置。
+
+每次更新参数，不一定要用全部训练数据来计算梯度。我们可以随机使用一个样本，或者一小批样本来估计整体梯度，这分别对应`随机梯度下降法 (SGD) `和`小批量随机梯度下降`
+
+#### 随机梯度下降法 (SGD) 
+随机梯度下降法 (SGD)  在 PyTorch 和 Keras 中，SGD 都是优化器的名称，负责根据梯度更新参数。
+```python
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+```
+
+#### Epochs  训练轮数
+训练通常需要很多轮。也就是说，系统需要多次处理训练集中的每个样本。
+
+#### 准备训练数据
+训练之前，需要先准备数据。下面将行驶里程和车费转换成 PyTorch 使用的数据格式，再把它们配对，按批次提供给模型。
+```python
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+# 把 Pandas 数据转换成 PyTorch 的 Tensor（张量）。
+# 输入特征 X：行程里程
+x:torch.Tensor = torch.tensor(training_df[['TRIP_MILES']].values, dtype=torch.float)
+# 真实标签 y：车费
+y:torch.Tensor = torch.tensor(training_df[['FARE']].values, dtype=torch.float)
+
+# 训练数据集
+dataset = TensorDataset(x, y)
+
+# 创建数据加载器
+# 假设你有 200 条训练数据，而模型每次只需要处理 50 条。
+# DataLoader 就可以把数据分成 4 个 Batch（批次），让训练循环依次获取。
+train_load = DataLoader(
+    dataset,
+    batch_size=batch_size,
+    shuffle=True
+    )
+```
+
+
+#### 前面介绍了梯度下降的原理，下面使用 PyTorch 展示模型如何按批次更新权重和偏置，并在每轮训练结束后计算训练集的平均损失。
+```python
+for epoch in range(epochs):
+    model.train()
+
+    for batch_x, batch_y in train_load:
+        # 1. 前向传播
+        prediction = model(batch_x)
+        # 2. 计算 Loss
+        loss = loss_fn(prediction, batch_y)
+
+        # 3. 清空梯度
+        optimizer.zero_grad()
+
+        # 4. 反向传播
+        loss.backward()
+
+        # 5. 更新参数
+        optimizer.step()
+    
+    # 把模型切换到评估模式（Evaluation Mode）。
+    model.eval()
+
+    # 关闭梯度记录
+    with torch.no_grad():
+        epoch_loss = 0
+
+        for eval_x, eval_y in train_load:
+            # 本例暂不划分数据集，直接计算模型在训练集上的平均损失
+            predictions = model(eval_x)
+
+            batch_loss = loss_fn(predictions, eval_y)
+            epoch_loss += batch_loss.item()
+
+        # 循环结束后，计算每个样本的平均损失
+        epoch_loss = epoch_loss / len(train_load.dataset)
+        print(f"epoch: {epoch+1}/{epochs}, loss: {epoch_loss:.4f}")
+
+```
+这里使用 `L1Loss(reduction="sum")`，损失函数已经计算了当前批次中所有样本的绝对误差之和。因此，每轮训练结束后，只需要重新计算并累加各批次的损失，再除以训练集的总样本数，就能得到当前模型在训练集上的平均绝对误差（MAE）。
+
+
+
+## 完整示例
+
+下面将数据读取、模型创建、训练和拟合线绘制组合起来。运行代码后，可以看到每轮训练的平均损失，以及最终的拟合直线。
+```python
+# 本例在 Python 3.13 环境下测试，使用 PyTorch 进行模型训练，pandas 读取数据，Matplotlib 绘制图表。
+import os
+# 本机 OpenMP 重复加载问题的临时绕过设置，并未消除底层运行库冲突
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+import torch
+import pandas as pd
+import matplotlib.pyplot as plt
+from torch.utils.data import TensorDataset, DataLoader
+
+# 随机种子， 42 是“生命、宇宙以及一切的终极答案”。
+torch.manual_seed(42)
+
+# 超参数
+# 训练轮数
+epochs = 20
+# 批量大小
+batch_size = 50
+# 学习率
+learning_rate = 0.001
+
+# 读取数据集
+chicago_taxi_dataset = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/chicago_taxi_train.csv")
+
+# TRIP_MILES  行程里程
+# TRIP_SECONDS 行程时长（秒）
+# FARE 票价
+# COMPANY  公司
+# PAYMENT_TYPE  支付方式
+# TIP_RATE 小费
+training_df:pd.Series | pd.DataFrame = chicago_taxi_dataset.loc[
+    :, ('TRIP_MILES', 'TRIP_SECONDS', 'FARE', 'COMPANY', 'PAYMENT_TYPE', 'TIP_RATE')]
+
+# 把 Pandas 数据转换成 PyTorch 的 Tensor（张量）。
+# 输入特征 X：行程里程
+x:torch.Tensor = torch.tensor(training_df[['TRIP_MILES']].values, dtype=torch.float)
+# 真实标签 y：车费
+y:torch.Tensor = torch.tensor(training_df[['FARE']].values, dtype=torch.float)
+
+# 训练数据集
+dataset = TensorDataset(x, y)
+# 创建数据加载器
+# 假设你有 200 条训练数据，而模型每次只需要处理 50 条。
+# DataLoader 就可以把数据分成 4 个 Batch（批次），让训练循环依次获取。
+train_load = DataLoader(
+    dataset,
+    batch_size=batch_size,
+    shuffle=True
+    )
+
+# 损失函数
+# L1 loss：绝对误差之和
+loss_fn = torch.nn.L1Loss(reduction="sum")
+
+# 创建模型
+model = torch.nn.Linear(in_features=1, out_features=1)
+
+# 优化器
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+
+for epoch in range(epochs):
+    model.train()
+
+    for batch_x, batch_y in train_load:
+        # 1. 前向传播
+        prediction = model(batch_x)
+        # 2. 计算 Loss
+        loss = loss_fn(prediction, batch_y)
+
+        # 3. 清空梯度
+        optimizer.zero_grad()
+
+        # 4. 反向传播
+        loss.backward()
+
+        # 5. 更新参数
+        optimizer.step()
+
+        # 把模型切换到评估模式（Evaluation Mode）。
+    model.eval()
+
+    # 关闭梯度记录
+    with torch.no_grad():
+
+        epoch_loss = 0
+        
+        for eval_x, eval_y in train_load:
+            # 本例暂不划分数据集，直接计算模型在训练集上的平均损失
+            predictions = model(eval_x)
+
+            batch_loss = loss_fn(predictions, eval_y)
+            epoch_loss += batch_loss.item()
+
+        # 循环结束后，计算每个样本的平均损失
+        epoch_loss = epoch_loss / len(train_load.dataset)
+        print(f"epoch: {epoch+1}/{epochs}, loss: {epoch_loss:.4f}")
+
+w = model.weight.item()
+b = model.bias.item()
+
+#  下面是线性回归计算， y=b+wx
+y_pre = b + w * x
+
+# 按顺序查找可用字体，兼容 macOS 和 Windows
+plt.rcParams["font.sans-serif"] = [
+    "Microsoft YaHei",  # Windows：微软雅黑
+    "PingFang SC",      # macOS：苹方
+    "Heiti SC",         # macOS：黑体
+    "SimHei",          # Windows：黑体
+    "DejaVu Sans",
+]
+
+# 避免部分中文字体无法显示负号
+plt.rcParams["axes.unicode_minus"] = False
+    # 配置图像
+plt.title("行驶里程与车费", fontsize=14)  # 设置图像名称
+plt.xlabel("行程里程")  # 设置横坐标的名称
+plt.ylabel("车费")  # 设置纵坐标的名称
+
+
+plt.plot(x, y_pre, color="red")
+plt.scatter(x, y, s=10, alpha=0.3)
+plt.show()
+
+```
+
+模型已经学习到了行程里程与车费之间的整体关系，但部分样本的预测结果仍存在较大误差。
+
+为了进一步改善预测效果，我们可以尝试增加一个输入特征，看看模型的表现是否有所提升。
+
+这次，我们选择**行程时长（TRIP_SECONDS）**作为第二个输入特征，与之前的行程里程（TRIP_MILES）一起用于模型训练。
+
+不过，在添加这个特征之前，我们需要先观察它的数据分布。
+由于行程时长以秒为单位，数值范围可能远大于行程里程。如果直接用于训练，训练将需要更长的时间才能收敛，甚至可能完全无法收敛！
+关于这个问题，可以参考 Google 机器学习速成课程中的
+[归一化](https://developers.google.com/machine-learning/crash-course/numerical-data/normalization)
+
+因此，我们先尝试对数据进行简单处理，将行程时长从秒转换为分钟，再将其加入模型。
+
+| - - - - - - - - 行驶里程（英里） - - - - - - - - | 行程时长（秒） | 处理后 --行程时长（分） | - - - - - - - - 车费 - - - - - - - - |
+| ---------------------------------------- | ------- | ------------- | ---------------------------------- |
+| 2.57                                     | 2341    | 39            | 31.99                              |
+| 1.18                                     | 1074    | 17.9          | 9.75                               |
+| 1.29                                     | 1173    | 19.55         | 10.25                              |
+| 3.7                                      | 3360    | 56            | 23.75                              |
+| 1.15                                     | 1044    | 17.4          | 10                                 |
+| 1.38                                     | 1251    | 20.85         | 11                                 |
+| 2                                        | 1813    | 30.22         | 14.5                               |
+| ...                                      | ...     | ...           | ...                                |
+
+```python
+training_df["TRIP_MINUTES"] = training_df["TRIP_SECONDS"] / 60
+# 把 Pandas 数据转换成 PyTorch 的 Tensor（张量）。
+# 输入特征 X：行程里程 , 行程时长（秒）
+x: torch.Tensor = torch.tensor(training_df[['TRIP_MILES', "TRIP_MINUTES"]].values, dtype=torch.float)
+# 真实标签 y：车费
+y: torch.Tensor = torch.tensor(training_df[['FARE']].values, dtype=torch.float)
+```
+
+随着模型的输入特征从一个增加到两个，之前使用的二维散点图已经不太适合同时展示所有变量之间的关系。
+因此，这次我们尝试使用**三维散点图（3D Scatter Plot）**进行可视化
+```python
+# 按顺序查找可用字体，兼容 macOS 和 Windows
+plt.rcParams["font.sans-serif"] = [
+    "Microsoft YaHei",  # Windows：微软雅黑
+    "PingFang SC",      # macOS：苹方
+    "Heiti SC",         # macOS：黑体
+    "SimHei",          # Windows：黑体
+    "DejaVu Sans",
+]
+
+
+# 创建画布，并添加三维坐标轴
+fig = plt.figure(figsize=(10, 8))
+ax = fig.add_subplot(111, projection="3d")
+
+# # 设置观察角度，使用 Y-up 坐标系（Y 轴朝上）
+ax.view_init(elev=25, azim=-60, vertical_axis="y")
+
+# 从数据集中随机抽取最多 2000 条样本，避免散点过于密集
+# 随机抽取最多 2000 条数据
+plot_df = training_df.sample(
+    n=min(2000, len(training_df)),
+    random_state=42
+)
+
+# X：行程里程
+plot_x = plot_df["TRIP_MILES"]
+
+# Y：车费
+plot_y = plot_df["FARE"]
+
+# Z：行程时长（分）
+plot_z = plot_df["TRIP_MINUTES"]
+
+ax.set_xlabel("行程里程")
+ax.set_ylabel("车费")
+ax.set_zlabel("行程分钟")
+
+# 绘制三维散点图
+# s：散点大小
+# alpha：透明度，范围为 0～1
+ax.scatter(plot_x, plot_y, plot_z, s=3, alpha=0.8)
+
+# 显示图表
+plt.show()
+```
+![data-points-3d](images/data-points-3d.png)
+
+接下来创建线性回归模型。
+由于输入特征从原来的一个增加到了两个，因此需要将 in_features 从 1 修改为 2，而输出仍然是预测车费，所以 out_features 保持为 1。
+```python
+model = torch.nn.Linear(in_features=2, out_features=1)
+```
+
+这次我们也尝试更换优化器，使用 RMSprop 代替之前的 SGD，看看不同的优化器是否会对模型的训练效果产生影响。
+```python
+# 优化器
+optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
+```
+
+训练部分的代码不需要修改，仍然沿用之前的训练流程。虽然这次增加了一个输入特征，并更换了优化器，但整体训练过程保持不变。
+不过，由于这次模型使用了两个输入特征，预测结果的可视化方式也需要相应调整。
+
+之前我们使用二维图展示线性回归的预测直线，而现在可以在三维坐标系中使用一个平面来表示模型的预测结果，从而更直观地观察模型对数据的拟合情况。
+```python
+# 创建网格范围
+# 分别在 X 轴（行程里程）和 Z 轴（行程时长）上取一组均匀分布的采样点
+# 这里使用 1% ~ 99% 分位数，而不是最小值和最大值，
+# 可以减少极端值对可视化范围的影响
+x_range = np.linspace(
+    np.percentile(plot_x, 1),
+    np.percentile(plot_x, 99),
+    30
+)
+z_range = np.linspace(
+    np.percentile(plot_z, 1),
+    np.percentile(plot_z, 99),
+    30
+)
+
+# 根据 x_range 和 z_range 创建二维网格
+# X 和 Z 的形状相同，表示平面上每一个采样点的坐标
+X, Z = np.meshgrid(x_range, z_range)
+
+# 将网格点整理成模型可输入的二维数组
+# 每个网格点包含两个输入特征：[TRIP_MILES, TRIP_MINUTES]
+grid = np.column_stack([X.ravel(), Z.ravel()])
+# 转换为 PyTorch 张量，供模型预测使用
+grid_tensor = torch.from_numpy(grid).float()
+
+# 关闭梯度计算，仅进行前向预测
+model.eval()
+with torch.no_grad():
+    # 对网格上的每个点进行预测，得到对应的车费
+    # 再将结果调整回与 X、Z 相同的网格形状
+    Y = model(grid_tensor).cpu().numpy().reshape(X.shape)
+
+# 绘制预测平面
+# X：行程里程
+# Y：预测车费
+# Z：行程时长
+# cmap：颜色映射
+# alpha：透明度
+ax.plot_surface(X, Y, Z, cmap="rainbow", alpha=1)
+
+```
+
+完成训练后，我们将实际车费数据与模型预测得到的平面绘制在同一张三维图中，以便更直观地观察模型的拟合情况。
+
+![points-with-model-3d.png](images/points-with-model-3d.png)
+
+从图中可以观察散点与预测平面之间的差异，了解模型对数据整体趋势的拟合情况。
+下面附上本次练习的完整代码。
+```python
+# 本例在 Python 3.13 环境下测试，使用 PyTorch 进行模型训练，pandas 读取数据，Matplotlib 绘制图表。
+import os
+
+# 本机 OpenMP 重复加载问题的临时绕过设置，并未消除底层运行库冲突
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+import numpy as np
+import torch
+import pandas as pd
+import matplotlib.pyplot as plt
+from torch.utils.data import TensorDataset, DataLoader
+
+# 随机种子， 42 是“生命、宇宙以及一切的终极答案”。
+torch.manual_seed(42)
+
+# 超参数
+# 训练轮数
+epochs = 20
+# 批量大小
+batch_size = 50
+# 学习率
+learning_rate = 0.001
+
+# 读取数据集
+chicago_taxi_dataset = pd.read_csv("https://download.mlcc.google.com/mledu-datasets/chicago_taxi_train.csv")
+
+# TRIP_MILES  行程里程
+# TRIP_SECONDS 行程时长（秒）
+# FARE 票价
+# COMPANY  公司
+# PAYMENT_TYPE  支付方式
+# TIP_RATE 小费
+training_df: pd.DataFrame = chicago_taxi_dataset.loc[
+    :, ('TRIP_MILES', 'TRIP_SECONDS', 'FARE', 'COMPANY', 'PAYMENT_TYPE', 'TIP_RATE')]
+
+
+training_df["TRIP_MINUTES"] = training_df["TRIP_SECONDS"] / 60
+# 把 Pandas 数据转换成 PyTorch 的 Tensor（张量）。
+# 输入特征 X：行程里程 , 行程时长（分钟）
+x: torch.Tensor = torch.tensor(training_df[['TRIP_MILES', "TRIP_MINUTES"]].values, dtype=torch.float)
+# 真实标签 y：车费
+y: torch.Tensor = torch.tensor(training_df[['FARE']].values, dtype=torch.float)
+
+# 训练数据集
+dataset = TensorDataset(x, y)
+# 创建数据加载器
+# 假设你有 200 条训练数据，而模型每次只需要处理 50 条。
+# DataLoader 就可以把数据分成 4 个 Batch（批次），让训练循环依次获取。
+train_load = DataLoader(
+    dataset,
+    batch_size=batch_size,
+    shuffle=True
+)
+
+# 损失函数：计算当前 Batch 的绝对误差之和
+loss_fn = torch.nn.L1Loss(reduction="sum")
+
+# 创建模型
+model = torch.nn.Linear(in_features=2, out_features=1)
+
+# 优化器
+optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
+
+for epoch in range(epochs):
+    model.train()
+
+    for batch_x, batch_y in train_load:
+        # 1. 前向传播
+        prediction = model(batch_x)
+        # 2. 计算 Loss
+        loss = loss_fn(prediction, batch_y)
+
+        # 3. 清空梯度
+        optimizer.zero_grad()
+
+        # 4. 反向传播
+        loss.backward()
+
+        # 5. 更新参数
+        optimizer.step()
+
+        # 把模型切换到评估模式（Evaluation Mode）。
+    model.eval()
+
+    # 关闭梯度记录
+    with torch.no_grad():
+
+        epoch_loss = 0
+
+        for eval_x, eval_y in train_load:
+            # 本例暂不划分数据集，直接计算模型在训练集上的平均损失
+            predictions = model(eval_x)
+
+            batch_loss = loss_fn(predictions, eval_y)
+            epoch_loss += batch_loss.item()
+
+        # 循环结束后，计算每个样本的平均损失
+        epoch_loss = epoch_loss / len(train_load.dataset)
+        print(f"epoch: {epoch + 1}/{epochs}, loss: {epoch_loss:.4f}")
+
+# 按顺序查找可用字体，兼容 macOS 和 Windows
+plt.rcParams["font.sans-serif"] = [
+    "Microsoft YaHei",  # Windows：微软雅黑
+    "PingFang SC",      # macOS：苹方
+    "Heiti SC",         # macOS：黑体
+    "SimHei",          # Windows：黑体
+    "DejaVu Sans",
+]
+
+
+fig = plt.figure(figsize=(10, 8))
+ax = fig.add_subplot(111, projection="3d")
+
+# Y-up 坐标系
+ax.view_init(elev=25, azim=-60, vertical_axis="y")
+
+# 从数据集中随机抽取最多 2000 条样本，避免散点过于密集
+# 随机抽取最多 2000 条数据
+plot_df = training_df.sample(
+    n=min(2000, len(training_df)),
+    random_state=42
+)
+# X：行程里程
+plot_x = plot_df["TRIP_MILES"]
+
+# Y：车费
+plot_y = plot_df["FARE"]
+
+# Z：行程时长（分）
+plot_z = plot_df["TRIP_MINUTES"]
+
+# 绘制三维散点图
+# s：散点大小
+# alpha：透明度，范围为 0～1
+ax.scatter(plot_x, plot_y, plot_z, s=3, alpha=0.8)
+
+# 创建网格范围
+# 分别在 X 轴（行程里程）和 Z 轴（行程时长）上取一组均匀分布的采样点
+# 这里使用 1% ~ 99% 分位数，而不是最小值和最大值，
+# 可以减少极端值对可视化范围的影响
+x_range = np.linspace(
+    np.percentile(plot_x, 1),
+    np.percentile(plot_x, 99),
+    30
+)
+z_range = np.linspace(
+    np.percentile(plot_z, 1),
+    np.percentile(plot_z, 99),
+    30
+)
+
+# 根据 x_range 和 z_range 创建二维网格
+# X 和 Z 的形状相同，表示平面上每一个采样点的坐标
+X, Z = np.meshgrid(x_range, z_range)
+
+# 将网格点整理成模型可输入的二维数组
+# 每个网格点包含两个输入特征：[TRIP_MILES, TRIP_MINUTES]
+grid = np.column_stack([X.ravel(), Z.ravel()])
+# 转换为 PyTorch 张量，供模型预测使用
+grid_tensor = torch.from_numpy(grid).float()
+
+# 关闭梯度计算，仅进行前向预测
+model.eval()
+with torch.no_grad():
+    # 对网格上的每个点进行预测，得到对应的车费
+    # 再将结果调整回与 X、Z 相同的网格形状
+    Y = model(grid_tensor).cpu().numpy().reshape(X.shape)
+
+# 绘制预测平面
+# X：行程里程
+# Y：预测车费
+# Z：行程时长
+# cmap：颜色映射
+# alpha：透明度
+ax.plot_surface(X, Y, Z, cmap="rainbow", alpha=1)
+
+ax.set_xlabel("行程里程")
+ax.set_ylabel("车费")
+ax.set_zlabel("行程分钟")
+
+# 显示图表
+plt.show()
+```
 
 ## lr_torch_1f_onnx.py：训练、保存与读取 ONNX 模型
 
@@ -126,28 +768,3 @@ predict(Path("models/lr_torch_1f.onnx"))
 
 导入模块不会执行 `if __name__ == '__main__':` 中的数据读取和训练，但仍需要模块顶部导入的库。当前训练指标来自训练集，脚本尚未自动对比 PyTorch 与 ONNX 的预测结果。
 
-## lr_torch_3f.py：公司字段编码练习
-
-`lr_torch_3f.py` 用于探索行程里程 `TRIP_MILES`、行程时长 `TRIP_SECONDS` 和公司 `COMPANY` 与车费 `FARE` 的关系。当前为对比测试，`_in_feature_names` 仅选择里程和时长，实际训练使用两个输入。脚本仍保留公司预处理：名称先统一大写、去掉逗号并清理首尾空格，再将名称中每个字符的 Unicode 编码（`ord()`）相加，最终转换为浮点数。这种方式将公司信息保留为一列，不使用独热编码。
-
-当前练习有意保留这一实现，接受以下局限：
-
-- 不同名称可能得到相同的编码和，例如 `AB` 与 `BA` 都得到 `131`，因此名称去重不代表数值编码唯一。
-- 编码的大小和差值不代表公司的收费关系。线性模型会用同一个公司权重乘以编码和，强制公司对预测值的影响随编码和线性变化，无法为每家公司独立学习调整金额。
-- 因此，该方式不适合作为线性回归中公司类别的一般编码方案；目前仅作为自定义字符串转数值的学习实验，不据此认定预测效果有所改善。
-
-后续围绕本练习检查代码时，将此编码方式视为已接受的限制，除非主动讨论编码方案，否则不重复建议替换。
-
-当前脚本已启用训练，模型输入数量由 `_in_feature_names` 决定。绘图保留训练 Loss、RMSE 曲线，并为每个输入特征绘制一张车费对比图：从训练数据抽取最多 200 条真实行程，对这批行程进行预测，以该特征为横轴，用蓝色散点表示真实车费、橙色叉号表示预测车费。两组点逐行对应，不使用人工网格或预测连线。若将公司加入输入列表，绘图也会使用该列；显示的仍是训练数据上的拟合表现。
-
-## 输入特征与模型参数
-
-“一个输入”指一个输入特征，即单变量线性回归。包含偏置的单变量线性回归模型有两个需要训练的参数：一个权重和一个偏置。
-
-多变量线性回归可以同时使用多个输入特征，例如行程里程和行程时长，其模型形式为：
-
-```text
-预测值 = 权重1 × 特征1 + 权重2 × 特征2 + … + 偏置
-```
-
-不同实现通过所用库和输入特征数量加以区分，新增练习可在上方表格中补充说明。
