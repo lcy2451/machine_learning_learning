@@ -12,7 +12,7 @@
 
 ## 内容入口
 1. [线性回归练习](./线性回归/README.md)：PyTorch 训练、绘图及 ONNX 导出与预测。
-2. [损失函数（Loss）](./loss/README.md)：损失函数基础笔记。
+2. [损失函数loss](./损失函数loss/README.md)：损失函数基础笔记。
 3. [小蓝吃球](./小蓝吃球/README.md)：线性回归的拓展实践，包含手写梯度下降、解析公式求解及 PyTorch 实现。
 4. [公平性练习](./公平性/README.md)：TensorFlow / MinDiff、PyTorch 收入分类、ONNX 分组评估、样本加权与 MMD 实验。
 5. [卷积](./卷积/README.md)：卷积神经网络相关实践。
