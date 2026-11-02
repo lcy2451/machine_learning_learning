@@ -69,7 +69,7 @@ def test(
 if __name__ == "__main__":
 
     # 训练轮数
-    _epochs = 2000
+    _epochs = 500
     # 批量大小
     _batch_size = 32
     # 学习率
@@ -94,10 +94,10 @@ if __name__ == "__main__":
         shuffle=True
     )
 
-    # _loss_fn = torch.nn.MSELoss(reduction="mean")
+    _loss_fn = torch.nn.MSELoss(reduction="mean")
     # _loss_fn = torch.nn.HuberLoss(reduction="mean")
     # _loss_fn = torch.nn.L1Loss(reduction="mean")
-    _loss_fn = torch.nn.SmoothL1Loss(reduction="mean")
+    # _loss_fn = torch.nn.SmoothL1Loss(reduction="mean")
 
     # 创建模型实例
     _model = LinearRegression()

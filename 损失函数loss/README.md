@@ -22,7 +22,7 @@ MSE 是最常用的损失函数之一。
 因为 MSE 会对误差进行平方，使较大的预测误差受到更强的惩罚，从而让模型在训练时更加重视大误差。
 因为梯度下降（Gradient Descent）利用导数（梯度）来更新模型参数，而 MSE 的求导过程简单，且导数连续、平滑，因此适合使用梯度下降进行优化。
 
-因为 MSE 对较大的预测误差采用平方惩罚，因此容易受到离群值（Outliers）的影响。当数据中存在较多离群值时，可以考虑使用 Huber Loss，提高模型训练的稳健性（Robustness）。
+MSE 对较大的预测误差采用平方惩罚，因此容易受到离群值（Outliers）的影响。当数据中存在较多离群值时，可以考虑使用 Huber Loss，提高模型训练的稳健性（Robustness）。
 
 MSE 通常不适合分类任务。当 MSE 与 Sigmoid 激活函数配合使用时，容易出现梯度过小的问题，尤其是在模型自信地预测错误时，可能导致训练缓慢。
 因此，分类任务通常使用交叉熵（Cross Entropy）等损失函数。
@@ -31,13 +31,14 @@ MSE 通常不适合分类任务。当 MSE 与 Sigmoid 激活函数配合使用�
 
 Softmax 和 CE（Cross Entropy，交叉熵）经常搭配使用，主要用于单标签多分类任务。
 
-有一点需要注意， PyTorch 的 BCEWithLogitsLoss 已经在内部结合了 Sigmoid + BCE，所以神经网络最后一层不应该再加 Sigmoid。
-在 PyTorch 中，如果使用 nn.CrossEntropyLoss()，模型最后一层就不要写 Softmax。
+需要注意的是，PyTorch 的 `BCEWithLogitsLoss` 已经在内部结合了 Sigmoid 和 BCE，因此模型输出层不需要再添加 Sigmoid。
+同样，`CrossEntropyLoss` 内部已经包含了 LogSoftmax，因此使用它时，模型输出层也不需要再添加 Softmax。
+
 
 上面简单了解了回归与分类任务中常见的损失函数，以及它们之间的区别。
 
 接下来，我们还是回到之前的线性回归任务，通过实际代码来进一步了解损失函数。
-这次更新了之前的线性回归代码，让它更符合 PyTorch 官方教程的代码风格：`mpg_torch_1f.py`。
+这次更新了之前的线性回归代码，让它更符合 PyTorch 官方教程的代码风格：[mpg_torch_1f.py](./mpg_torch_1f.py)。
 同时，使用 GPT 老师帮我找到的 Auto MPG 数据集，以汽车重量（weight）作为输入特征，预测燃油经济性（mpg）。
 
 ![auto_mpg_data_points.png](images/auto_mpg_data_points.png)
@@ -57,3 +58,4 @@ MSE 大约 20 Epoch 就能得到不错的拟合效果，而 Huber Loss 在 2000 
 最后尝试了 SmoothL1Loss，发现它与 Huber Loss 一样，大约需要 2000 Epoch 才能得到较好的拟合效果。
 这是因为 PyTorch 默认参数下，SmoothL1Loss 与 Huber Loss 的计算方式相同，因此两者具有相同的优化特性。
 
+![auto_mpg_data_points_with_model.png](images/auto_mpg_data_points_with_model.png)
