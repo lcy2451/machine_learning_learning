@@ -124,9 +124,9 @@ Google 原练习把 `Day 4` 称为 Thursday，参考答案使用 `day == 4`。�
 
 ```powershell
 conda activate machine_learning
-cd 处理数值数据
+cd 数据处理-归一化
 python numerical_data_stats.py
 python numerical_data_bad_values.py
 ```
 
-`numerical_data_stats.py` 使用相对路径 `../data/california_housing_train.csv`，因此需要从“处理数值数据”目录运行。两个脚本使用 pandas，异常数据练习还导入 Matplotlib 以绘制散点图。
+`numerical_data_stats.py` 使用相对路径 `../data/california_housing_train.csv`，因此需要从“数据处理-归一化”目录运行。两个脚本使用 pandas，异常数据练习还导入 Matplotlib 以绘制散点图。
