@@ -105,9 +105,6 @@ if __name__ == "__main__":
     val_encoded = pd.get_dummies(val_categories, dtype=int)
     test_encoded = pd.get_dummies(test_categories, dtype=int)
 
-    print(test_encoded)
-    exit()
-
     # to tensor
     _x = torch.tensor(encoded.to_numpy(), dtype=torch.float32)
     _val = torch.tensor(val_encoded.to_numpy(), dtype=torch.float32)
