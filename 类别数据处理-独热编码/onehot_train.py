@@ -115,6 +115,7 @@ if __name__ == "__main__":
     mnth_encoder.fit(_train_df[["mnth"]])
     mnth_transformed = mnth_encoder.transform(_train_df[["mnth"]])
     mnth_val_transformed = mnth_encoder.transform(_trai_val_df[["mnth"]])
+    mnth_test_transformed = mnth_encoder.transform(_trai_test_df[["mnth"]])
 
     # #  创建一个包含分类变量的 Series
     hr_encoder = OneHotEncoder()
@@ -122,6 +123,7 @@ if __name__ == "__main__":
     hr_encoder.fit(_train_df[["hr"]])
     hr_transformed = hr_encoder.transform(_train_df[["hr"]])
     hr_val_transformed = hr_encoder.transform(_trai_val_df[["hr"]])
+    hr_test_transformed = hr_encoder.transform(_trai_test_df[["hr"]])
     # print(len(hr_encoder.categories_[0]))
     # print(y.columns)
     
@@ -139,6 +141,10 @@ if __name__ == "__main__":
     elapsed_days = (train_dates - dates.min()).dt.days
     dteday_val_scaled = scaler.transform(elapsed_days.to_frame())
 
+    test_dates = pd.to_datetime(_trai_test_df["dteday"])
+    test_elapsed_days = (test_dates - dates.min()).dt.days
+    dteday_test_scaled = scaler.transform(test_elapsed_days.to_frame())
+
     # 初始化 OneHotEncoder 对象
     encoder = OneHotEncoder()
     # X["season"]:pd.Series
@@ -150,6 +156,7 @@ if __name__ == "__main__":
     # 转换，不重新学习规则
     season_transformed = encoder.transform(_train_df[["season"]])
     season_val_transformed = encoder.transform(_trai_val_df[["season"]])
+    season_test_transformed = encoder.transform(_trai_test_df[["season"]])
 
     weekday_encoder = OneHotEncoder()
     # 学习规则
@@ -157,6 +164,7 @@ if __name__ == "__main__":
     # 转换，不重新学习规则
     weekday_transformed = weekday_encoder.transform(_train_df[["weekday"]])
     weekday_val_transformed = weekday_encoder.transform(_trai_val_df[["weekday"]])
+    weekday_test_transformed = weekday_encoder.transform(_trai_test_df[["weekday"]])
 
     weathersit_encoder = OneHotEncoder()
     # 学习规则
@@ -164,6 +172,7 @@ if __name__ == "__main__":
     # 转换，不重新学习规则
     weathersit_transformed = weathersit_encoder.transform(_train_df[["weathersit"]])
     weathersit_val_transformed = weathersit_encoder.transform(_trai_val_df[["weathersit"]])
+    weathersit_test_transformed = weathersit_encoder.transform(_trai_test_df[["weathersit"]])
 
     combined = np.concatenate(
     [
@@ -196,12 +205,30 @@ if __name__ == "__main__":
     _val_x = torch.as_tensor(val_combined, dtype=torch.float32)
     _val_y = torch.tensor(_label_val_df[["cnt"]].values, dtype=torch.float32)
 
+    test_combined = np.concatenate(
+        [
+            season_test_transformed.toarray(), # 4
+            dteday_test_scaled, # 1
+            weekday_test_transformed.toarray(), # 7
+            weathersit_test_transformed.toarray(), # 4
+            mnth_test_transformed.toarray(), # 12
+            hr_test_transformed.toarray(), #24
+           _trai_test_df[["yr", "temp", "hum", "atemp", "holiday", "workingday", "windspeed"]].values #7
+           ],
+        axis=1
+        )
+    
+    _test_x = torch.as_tensor(test_combined, dtype=torch.float32)
+    _test_y = torch.tensor(_label_test_df[["cnt"]].values, dtype=torch.float32)
 
     _train_dataset = TensorDataset(_x, _y)
     _train_dataload = DataLoader(_train_dataset, batch_size=_batch_size, shuffle=True)
 
     _val_dataset = TensorDataset(_val_x, _val_y)
     _val_dataload = DataLoader(_val_dataset, batch_size=_batch_size, shuffle=False)
+
+    _test_dataset = TensorDataset(_test_x, _test_y)
+    _test_dataload = DataLoader(_test_dataset, batch_size=_batch_size, shuffle=False)
 
     # 损失函数 模型 优化器
     _loss_fn = torch.nn.MSELoss(reduction="mean")
@@ -226,4 +253,8 @@ if __name__ == "__main__":
         print("Done!")
     print("end")
 
-
+    test(
+        test_load=_test_dataload,
+        model=_model,
+        loss_fn=_loss_fn)
+    test(_val_dataload, _model, _loss_fn)
