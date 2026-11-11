@@ -10,7 +10,7 @@ https://www.runoob.com/pandas/pandas-pd-get-dummies.html
 
 `pd.get_dummies()` 是 Pandas 库的顶级函数，用于将分类变量转换为独热编码格式。
 
-本次练习使用 Bike Sharing 数据集， 用season预测cnt。
+本次练习使用 Bike Sharing 数据集， 预测cnt。
 训练文件：[onehot_train.py](onehot_train.py)
 
 [Bike Sharing](https://archive.ics.uci.edu/dataset/275/bike+sharing+datase)
@@ -69,3 +69,17 @@ combined = np.concatenate(
     )
 x = torch.as_tensor(combined, dtype=torch.float32)
 ```
+
+最开始，我只对 `season` 进行了独热编码，并使用线性回归模型预测共享单车的租赁数量。但训练效果并不理想，Loss 甚至高达 30000 多。
+
+于是，我尝试增加更多输入特征，但 Loss 依然没有明显改善。最后，我干脆把数据集中所有适合用于预测的特征都加了进去，效果仍然不佳。
+
+我开始怀疑是不是线性回归模型的表达能力不足，于是决定升级模型，尝试使用多层神经网络。
+
+不过，目前我对神经网络还不够熟悉，只能先采用“力大砖飞”的办法——增加网络层数和神经元数量，猛猛加参数！
+
+经过一番尝试，训练 Loss 终于降低到了 100 以下。
+
+但新的问题又出现了：虽然模型在训练集上的表现很好，验证集和测试集的 Loss 却高达 2000 多，表现出明显的过拟合迹象。
+
+目前我还没有系统学习如何解决过拟合问题，因此这次实验就先到这里。等后续学到相关知识，再回来尝试改善模型的泛化能力。
