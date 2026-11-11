@@ -27,7 +27,7 @@ from sklearn.preprocessing import OneHotEncoder
 ```
 
 转换为独热编码， 先用训练集学习规则， 然后用训练集和验证集还有测试集转换
-也可以用 fit_transform 同时完成学习规则和转换， 分开做是要考虑 验证集还有测试集不用重复转换
+也可以用 fit_transform 同时完成学习规则和转换， 分开做是要考虑， ==验证集和测试集需要转换，但不能重新学习编码规则。==
 ```python
 # 初始化 OneHotEncoder 对象
 encoder = OneHotEncoder()
@@ -64,7 +64,7 @@ torch.nn.Linear(in_features=4, out_features=1)
 但我觉得只靠season无法拟合我的模型， 我想增加更多的输入， 我可以这样处理
 ```python
 combined = np.concatenate(
-    [df_transformed.toarray(), X[["temp", "windspeed", "hum", "atemp", "temp", "weekday"]].values],
+    [df_transformed.toarray(), X[["temp", "windspeed", "hum", "atemp", "weekday"]].values],
     axis=1
     )
 x = torch.as_tensor(combined, dtype=torch.float32)
