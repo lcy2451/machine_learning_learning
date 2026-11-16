@@ -3,15 +3,15 @@
 **特征交叉（Feature Crosses）** 是通过对数据集中的两个或多个类别特征或分桶后的特征进行组合（即计算笛卡尔积）而构造的新特征。
 
 与**多项式变换（Polynomial Transforms）** 类似，特征交叉使线性模型能够处理非线性关系。此外，特征交叉还可以表示不同特征之间的交互作用。
->也是增加输入特征的一种方式, 和多项式变换的区别是这个是对两个或多个变换的
+>也是增加输入特征的一种方式
 
 
 看完Google的[特征交叉练习](https://developers.google.com/machine-learning/crash-course/categorical-data/feature-cross-exercises)， 感觉完全没有练习到， 完全没有任何用
 
 https://zhuanlan.zhihu.com/p/618399610
 
-## 特征交叉主要有两大类：1) 显示交叉；2) 隐式交叉
-我这里只看显示交叉
+## 特征交叉主要有两大类：1)显式交叉；2) 隐式交叉（Implicit Crosses）
+我这里只看显式交叉（Explicit Crosses）
 例如，考虑一个具有以下类别特征的叶子数据集：
 edges叶片边缘的形态特征 ，包含 smooth平滑 、 toothed锯齿状 和 lobed分裂状 
 arrangement叶片在茎上的排列方式 ，包含 opposite对生 和 alternate互生 
@@ -74,7 +74,7 @@ cap_transformed = cap_encoder.transform(cap_cross.to_frame())
 ```
 随着参与交叉的类别特征增多，特征维度可能迅速膨胀。
 
-本次使用 Mushroom 数据集进行实验，对菌盖、菌褶、菌柄和菌环等类别特征分别进行了特征交叉，并使用独热编码将其转换为数值特征。
+本次训练使用 菌盖、菌褶、菌柄和菌环等类别特征分别进行了特征交叉，并使用独热编码将其转换为数值特征。
 
 根据目前的实验统计，得到以下结果：
 

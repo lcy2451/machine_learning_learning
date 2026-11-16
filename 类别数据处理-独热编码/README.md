@@ -8,8 +8,6 @@
 
 https://www.runoob.com/pandas/pandas-pd-get-dummies.html
 
-`pd.get_dummies()` 是 Pandas 库的顶级函数，用于将分类变量转换为独热编码格式。
-
 本次练习使用 Bike Sharing 数据集， 预测cnt。
 训练文件：[onehot_train.py](onehot_train.py)
 
@@ -29,17 +27,16 @@ from sklearn.preprocessing import OneHotEncoder
 转换为独热编码， 先用训练集学习规则， 然后用训练集和验证集还有测试集转换
 也可以用 fit_transform 同时完成学习规则和转换， 分开做是要考虑， ==验证集和测试集需要转换，但不能重新学习编码规则。==
 ```python
-# 初始化 OneHotEncoder 对象
+# 初始化 OneHotEncoder
 encoder = OneHotEncoder()
 
-# X["season"]:pd.Series
-# 学习规则
-encoder.fit(X[["season"]])
+# 使用训练集学习编码规则
+encoder.fit(_train_df[["season"]])
 
-# encoder.transform()
-# print(encoder.categories_)
-# 转换，不重新学习规则
-df_transformed = encoder.transform(X[["season"]])
+# 分别转换训练集、验证集和测试集
+season_transformed = encoder.transform(_train_df[["season"]])
+season_val_transformed = encoder.transform(_trai_val_df[["season"]])
+season_test_transformed = encoder.transform(_trai_test_df[["season"]])
 ```
 
 打印OneHotEncoder 对象的一些信息
@@ -53,10 +50,13 @@ encoder.get_feature_names_out()
 
 转换为tensor对象
 ```python
-x = torch.as_tensor(df_transformed.toarray(), dtype=torch.float32)
+x = torch.as_tensor(
+    season_transformed.toarray(),
+    dtype=torch.float32
+)
 ```
 
-这时创建模型需要有4个输入
+因为 season 有四个类别，所以独热编码之后有四个输入特征。
 ```python
 torch.nn.Linear(in_features=4, out_features=1)
 ```
@@ -64,11 +64,16 @@ torch.nn.Linear(in_features=4, out_features=1)
 但我觉得只靠season无法拟合我的模型， 我想增加更多的输入， 我可以这样处理
 ```python
 combined = np.concatenate(
-    [df_transformed.toarray(), X[["temp", "windspeed", "hum", "atemp", "weekday"]].values],
+    [
+        season_transformed.toarray(),
+        _train_df[["temp", "windspeed", "hum", "atemp"]].values
+    ],
     axis=1
-    )
+)
+
 x = torch.as_tensor(combined, dtype=torch.float32)
 ```
+此时输入特征从 4 个变成 8 个，模型的 in_features 也需要相应调整。
 
 最开始，我只对 `season` 进行了独热编码，并使用线性回归模型预测共享单车的租赁数量。但训练效果并不理想，Loss 甚至高达 30000 多。
 
