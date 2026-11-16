@@ -12,6 +12,7 @@ __pycache__/
 # 训练生成的 ONNX 模型及外部权重
 *.onnx
 *.onnx.data
+checkpoint.pt
 
 # 公平性实验生成的 HTML 报告
 /公平性/fairness_report.html
