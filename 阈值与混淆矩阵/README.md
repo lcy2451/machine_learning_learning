@@ -24,7 +24,9 @@ pred = torch.where(prob > _threshold, 1, 0)
 
 因此，我们可以结合混淆矩阵观察不同阈值下的分类结果，并根据实际需求调整阈值，在误报和漏报之间找到合适的平衡。
 
-混淆矩阵是用于评估逻辑回归等分类模型预测结果的工具。通过观察不同阈值下的混淆矩阵，可以了解模型的误报和漏报情况，并根据实际需求调整分类阈值。 使用PyTorch实现混淆矩阵
+混淆矩阵是用于评估逻辑回归等分类模型预测结果的工具。通过观察不同阈值下的混淆矩阵，可以了解模型的误报和漏报情况，并根据实际需求调整分类阈值。
+
+使用PyTorch实现混淆矩阵
 ```python
 from torchmetrics.classification import BinaryConfusionMatrix
 confusion_matrix = BinaryConfusionMatrix(threshold=0.5)
@@ -36,6 +38,14 @@ print(result)
 # tensor([[ 5,  0],
 #         [ 0, 20]])
 ```
+我这里用的是 torchmetrics 库 ， 他输出的混淆矩阵顺序跟官方的不一样
+
+https://lightning.ai/docs/torchmetrics/stable/classification/confusion_matrix
+
+| TN 真负例 True negatives | FP 假正例 False positives |
+|---|---|
+| FN 假负例 False negatives | TP 真正例 True positives |
+
 用seaborn库可视化
 ```python
 import matplotlib.pyplot as plt
@@ -47,10 +57,7 @@ sns.heatmap(
     annot=True,
     fmt="d",
     cmap="Blues",
-    xticklabels=["Negative", "Positive"],
-    yticklabels=["Negative", "Positive"]
 )
-
 plt.xlabel("Predicted Label")
 plt.ylabel("True Label")
 plt.title("Confusion Matrix")

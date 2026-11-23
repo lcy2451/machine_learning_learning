@@ -183,8 +183,6 @@ if __name__ == "__main__":
                 annot=True,
                 fmt="d",
                 cmap="Blues",
-                xticklabels=["Negative", "Positive"],
-                yticklabels=["Negative", "Positive"]
             )
 
             plt.xlabel("Predicted Label")
