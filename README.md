@@ -35,7 +35,8 @@
 22. [分类指标：准确率、召回率、精确率及相关指标](./分类指标：准确率、召回率、精确率及相关指标/README.md)
 23. [分类指标：ROC 与 AUC](./分类指标：ROC%20与%20AUC/README.md)
 24. [预测偏差](./预测偏差/README.md)
+25. [神经网络](./神经网络/README.md)
 ---
-25. [小蓝吃球](./小蓝吃球/README.md)：线性回归的拓展实践，包含手写梯度下降、解析公式求解及 PyTorch 实现。
-26. [公平性练习](./公平性/README.md)：TensorFlow / MinDiff、PyTorch 收入分类、ONNX 分组评估、样本加权与 MMD 实验。
-27. [卷积](./卷积/README.md)：卷积神经网络相关实践。
+26. [小蓝吃球](./小蓝吃球/README.md)：线性回归的拓展实践，包含手写梯度下降、解析公式求解及 PyTorch 实现。
+27. [公平性练习](./公平性/README.md)：TensorFlow / MinDiff、PyTorch 收入分类、ONNX 分组评估、样本加权与 MMD 实验。
+28. [卷积](./卷积/README.md)：卷积神经网络相关实践。

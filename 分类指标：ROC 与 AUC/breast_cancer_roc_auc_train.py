@@ -172,7 +172,6 @@ if __name__ == "__main__":
         for X, y_true in test_loader:
             logits = _model(X)
             y_probability = torch.sigmoid(logits)
-            fpr, tpr, thresholds = roc_curve(y_true, y_probability)
             all_labels.extend(y_true.cpu().numpy())
             all_probabilities.extend(y_probability.cpu().numpy())
 
