@@ -36,7 +36,9 @@
 23. [分类指标：ROC 与 AUC](./分类指标：ROC%20与%20AUC/README.md)
 24. [预测偏差](./预测偏差/README.md)
 25. [神经网络](./神经网络/README.md)
+26. [嵌入空间与食物推荐](./嵌入空间与食物推荐/README.md)
+27. [嵌入空间-word2vec](./嵌入空间-word2vec/README.md)
 ---
-26. [小蓝吃球](./小蓝吃球/README.md)：线性回归的拓展实践，包含手写梯度下降、解析公式求解及 PyTorch 实现。
-27. [公平性练习](./公平性/README.md)：TensorFlow / MinDiff、PyTorch 收入分类、ONNX 分组评估、样本加权与 MMD 实验。
-28. [卷积](./卷积/README.md)：卷积神经网络相关实践。
+28. [小蓝吃球](./小蓝吃球/README.md)：线性回归的拓展实践，包含手写梯度下降、解析公式求解及 PyTorch 实现。
+29. [公平性练习](./公平性/README.md)：TensorFlow / MinDiff、PyTorch 收入分类、ONNX 分组评估、样本加权与 MMD 实验。
+30. [卷积](./卷积/README.md)：卷积神经网络相关实践。
