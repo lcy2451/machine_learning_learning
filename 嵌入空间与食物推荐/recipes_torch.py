@@ -18,7 +18,7 @@ class FoodClassifier(torch.nn.Module):
         super().__init__(*args, **kwargs)
 
         self.embedding = torch.nn.Embedding(
-            num_embeddings=216,
+            num_embeddings=2420,
             embedding_dim=3
         )
         self.network = torch.nn.Sequential(
@@ -26,7 +26,7 @@ class FoodClassifier(torch.nn.Module):
             torch.nn.Linear(in_features=3, out_features=8),
             torch.nn.ReLU(),
 
-            torch.nn.Linear(in_features=8, out_features=216),
+            torch.nn.Linear(in_features=8, out_features=2420),
         )
 
     def forward(self, x):
@@ -109,6 +109,9 @@ if __name__ == "__main__":
     # 早停耐心值
     _patience = 20
 
+    # 正则化率
+    _weight_decay = 0.1
+
 
     RAW_interactions = Path(__file__).parent.parent / "data" / "RAW_interactions.csv"
     RAW_interactions_pd = pd.read_csv(RAW_interactions)
@@ -129,114 +132,30 @@ if __name__ == "__main__":
     # RAW_interactions_pd.to_csv(Path(__file__).parent.parent / "data" / "RAW_interactions_cleaned.csv", index=False)
     # print(f"{RAW_interactions_pd.shape}") # (234428, 5)
 
-    RAW_interactions_cleaned = Path(__file__).parent.parent / "data" / "RAW_interactions_cleaned.csv"
-    RAW_interactions_cleaned_pd = pd.read_csv(RAW_interactions_cleaned)
+    # RAW_interactions_cleaned = Path(__file__).parent.parent / "data" / "RAW_interactions_cleaned.csv"
+    # RAW_interactions_cleaned_pd = pd.read_csv(RAW_interactions_cleaned)
 
-    # 统计每种菜谱被多少个不同的用户评价过。
-    recipe_counts = RAW_interactions_cleaned_pd.groupby("recipe_id")["user_id"].nunique()
+    # groupby("recipe_id")：按照菜谱ID进行分组。
+    # ["user_id"]：获取每组中的用户ID。
+    # nunique()：统计不同用户的数量，重复用户只计算一次。
+    recipe_counts = RAW_interactions_pd.groupby("recipe_id")["user_id"].nunique()
     # 然后按照用户数量降序排列：
+    # sort_values()根据Series的值进行排序。
+    # - ascending = True：升序，从小到大。
+    # - ascending = False：降序，从大到小。
+    #  这个是为了打印方便
     recipe_counts = recipe_counts.sort_values(ascending=False)
 
-    # print(recipe_counts)
-    # print(recipe_counts.describe())
-
-    # for count in [1, 2, 3, 5, 10, 20, 30, 50, 100]:
-    #     print(count, (recipe_counts >= count).sum())
-    #
-    # for count in [5, 10, 20, 30, 50]:
-    #     # 筛选符合条件的菜谱
-    #     valid_recipes = recipe_counts[recipe_counts >= count].index
-    #
-    #     # 保留对应的评价数据
-    #     filtered_pd = RAW_interactions_cleaned_pd[
-    #         RAW_interactions_cleaned_pd["recipe_id"].isin(valid_recipes)
-    #     ]
-    #
-    #     # 统计每个用户评价过多少种菜谱
-    #     user_counts = filtered_pd.groupby("user_id")["recipe_id"].nunique()
-    #
-    #     print(
-    #         count,
-    #         len(valid_recipes),
-    #         (user_counts >= 5).sum()
-    #     )
-
+    # 这行代码是为了获取至少被 30 个不同用户评价过的菜谱 ID。
     valid_recipes = recipe_counts[recipe_counts >= 30].index
 
-    RAW_interactions_cleaned_pd = RAW_interactions_cleaned_pd[
-        RAW_interactions_cleaned_pd["recipe_id"].isin(valid_recipes)
+    RAW_interactions_pd = RAW_interactions_pd[
+        RAW_interactions_pd["recipe_id"].isin(valid_recipes)
     ].reset_index(drop=True)
-    # exit()
 
-    # # 绘制分布图
-    # orig_foods_along_dimension = ["very gouda pecan biscuits",
-    #                               "salad",
-    #                               "creole veggie burgers",
-    #                               "french strawberry crepes",
-    #                               "fresh tomato soup with rice"]
-    # food_ratings = {}
-    # user = 5060
-    #
-    # for i in range(RAW_interactions_cleaned_pd.shape[0]):
-    #     user_id = RAW_interactions_cleaned_pd["user_id"][i]
-    #
-    #     if user_id == user:
-    #         recipe_id = RAW_interactions_cleaned_pd['recipe_id'][i]
-    #         recipes_name: pd.Series = RAW_recipes_pd.loc[RAW_recipes_pd['id'] == recipe_id, 'name']
-    #         recipes_name_str = recipes_name.item()
-    #         if recipes_name_str in orig_foods_along_dimension:
-    #             rating: pd.Series = RAW_interactions_cleaned_pd['rating'][i]
-    #             food_ratings[recipes_name_str] = rating.item()
-    #             # print(f"{recipes_name_str} {rating.item()}")
-    #
-    # print(food_ratings)
-    # food_names = list(food_ratings.keys())
-    # ratings = list(food_ratings.values())
-    #
-    # plt.figure(figsize=(12, 3))
-    #
-    # plt.scatter(ratings, [0] * len(ratings))
-    #
-    # for i, (name, rating) in enumerate(zip(food_names, ratings)):
-    #     plt.annotate(
-    #         name,
-    #         (rating, 0),
-    #         xytext=(0, 40 if i % 2 == 0 else -40),
-    #         textcoords="offset points",
-    #         ha="center",
-    #         arrowprops=dict(
-    #             arrowstyle="-",
-    #             linestyle="--",
-    #             color="gray"
-    #         )
-    #     )
-    #
-    # plt.axhline(y=0, color="gray")
-    # plt.xlim(0.5, 5.5)
-    # plt.xticks(range(1, 6))
-    # plt.yticks([])
-    # plt.xlabel("Preference")
-    # plt.title(f"User {user} - Food Preference Space")
-    #
-    # plt.tight_layout()
-    # plt.show()
-
-    # 整理训练输入
-    # 如果用户只吃过一种食物就不参与训练， 需要至少5种
-    # users = []
-    # for i in range(len(RAW_interactions_cleaned_pd)):
-    #     user_id = int(RAW_interactions_cleaned_pd["user_id"][i])
-    #     if RAW_interactions_cleaned_pd.loc[RAW_interactions_cleaned_pd["user_id"] == user_id, "recipe_id"].shape[0] >= 5:
-    #         users.append(user_id)
-    # users = list(set(users))
-
-    user_counts = RAW_interactions_cleaned_pd.groupby("user_id")["recipe_id"].nunique()
+    user_counts = RAW_interactions_pd.groupby("user_id")["recipe_id"].nunique()
 
     users = user_counts[user_counts >= 5].index.tolist()
-
-    # print(len(users))
-
-    # 去掉只有一些用户现在只有 3588个用户
 
     users_train, users_temp = train_test_split(
         users, train_size=0.8, random_state=42
@@ -249,16 +168,14 @@ if __name__ == "__main__":
     recipe_id_to_index = {}
     datasets = []
 
-    for _users in [users_train, users_val, users_test]:
+    def build_samples(userlist) -> tuple[torch.Tensor, torch.Tensor]:
         __x = []
         __y = []
-
-        for user_id in _users:
-            recipes = RAW_interactions_cleaned_pd.loc[
-                RAW_interactions_cleaned_pd["user_id"] == user_id,
+        for user_id in userlist:
+            recipes = RAW_interactions_pd.loc[
+                RAW_interactions_pd["user_id"] == user_id,
                 ["recipe_id", "rating"]
             ]
-
             recipes = recipes.sort_values("rating", ascending=False)
             recipes = recipes.drop_duplicates(subset="recipe_id").head(5)
 
@@ -270,7 +187,6 @@ if __name__ == "__main__":
                     recipe_id_to_index[recipe_id] = len(recipe_id_to_index)
 
                 ___x.append(recipe_id_to_index[recipe_id])
-
             # 每种菜谱轮流作为标签
             for i in range(len(___x)):
                 __x.append(___x[:i] + ___x[i + 1:])
@@ -279,12 +195,13 @@ if __name__ == "__main__":
         _x = torch.tensor(__x, dtype=torch.long)
         _y = torch.tensor(__y, dtype=torch.long)
 
-        datasets.append((_x, _y))
+        return _x, _y
+
 
     # 分别获取三个数据集
-    x_train, y_train = datasets[0]
-    x_val, y_val = datasets[1]
-    x_test, y_test = datasets[2]
+    x_train, y_train = build_samples(users_train)
+    x_val, y_val = build_samples(users_val)
+    x_test, y_test = build_samples(users_test)
 
     # print(_x.shape)
     # print(_y.shape)
@@ -314,7 +231,6 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=_batch_size, shuffle=False)
     val_loader = DataLoader(valid_dataset, batch_size=_batch_size, shuffle=False)
 
-    print(len(recipe_id_to_index))
     # exit()
     # 损失函数
     loss_fn = torch.nn.CrossEntropyLoss().to(_device)
@@ -322,14 +238,7 @@ if __name__ == "__main__":
     # 创建模型实例
     _model = FoodClassifier().to(_device)
 
-    # # 优化器
-    # _optimizer = torch.optim.AdamW(
-    #     _model.parameters(),  # 需要优化的模型参数
-    #     lr=_learning_rate,  # 学习率
-    #     betas=(0.9, 0.999),  # 一阶与二阶动量的衰减系数
-    #     eps=1e-8,  # 防止除零的小常数
-    #     weight_decay=0.1  # 权重衰减（AdamW为解耦方式）
-    # )
+    # 优化器
     muon_params = []
     adamw_params = []
 
@@ -338,18 +247,18 @@ if __name__ == "__main__":
             muon_params.append(param)
         else:
             adamw_params.append(param)
+        print(name)
 
     _optimizer_muon = torch.optim.Muon(
         muon_params,
-        lr=0.001,
-        momentum=0.95,
-        weight_decay=0.1
+        lr=_learning_rate,
+        weight_decay=_weight_decay
     )
 
     _optimizer_adamw = torch.optim.AdamW(
         adamw_params,
-        lr=0.001,
-        weight_decay=0.1
+        lr=_learning_rate,
+        weight_decay=_weight_decay
     )
 
     _loss_on_validations = []

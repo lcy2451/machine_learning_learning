@@ -85,51 +85,185 @@
 
 ---
 ## 代码部分
+Google 拿食物举例，收集用户最喜欢的五种食物， 将五种食物中的四种设为特征数据， 然后随机将第五种食物留出作为模型的标签，
+使用 softmax 损失来优化模型预测， 我找 gpt 老师教我写这个练习， 但结果并不好， 是我机器学习知识还不足， 还得多练， 
+不过我现在还没想在嵌入上面下太多功夫， 即使不好， 也先这样吧
 
-本次练习使用， Recipes and Ratings 数据集
+本次练习使用的 Recipes and Ratings 数据集
 
 [Recipes and Ratings](https://practicaldsc.org/sp25/final-project/datasets/recipes-and-ratings)
 
-这个数据集有两个 csv, RAW_interactions.csv 和 RAW_recipes.csv。
+完整的代码在 [recipes_torch.py](recipes_torch.py)
 
-RAW_interactions.csv 包含针对 RAW_recipes.csv 中食谱提交的评论和评分。
-RAW_recipes.csv 包含食谱。
+训练目标是输入4个食物， 预测一个食物（老实说我看不懂）
+现在数据集有个问题，就是很多菜谱只有一条评论， 这让模型很难学习菜谱之间的关系， 这个问题可以被称为 **数据稀疏（Data Sparsity）**。
 
-两个csv的关系是， interactions是用户对  recipes食谱 的评价， 有83782个食物， 731927条评价, 但是有的用户评价找不到对应的食谱， 
-经过我的筛选有效的评论只有 234428 条
+首先统计每种菜谱被多少个不同的用户评价过。
+这一步是为了统计每种菜谱的用户覆盖数量，方便后续过滤低频菜谱。
 ```python
-from pathlib import Path
-
-import pandas as pd
-
-RAW_interactions = Path(__file__).parent.parent / "data" / "RAW_interactions.csv"
-RAW_interactions_pd = pd.read_csv(RAW_interactions)
-
-RAW_recipes = Path(__file__).parent.parent / "data" / "RAW_recipes.csv"
-RAW_recipes_pd = pd.read_csv(RAW_recipes)
-
-# 清理无效评论
-_drop_id = []
-for i in range(RAW_interactions_pd.shape[0]):
-    user_id = RAW_interactions_pd['user_id'][i]
-    recipe_id = RAW_interactions_pd['recipe_id'][i]
-    rating = RAW_interactions_pd['rating'][i]
-    recipes_name:pd.Series = RAW_recipes_pd.loc[RAW_recipes_pd['id'] == recipe_id, 'name']
-    if recipes_name.empty:
-        _drop_id.append(i)
-RAW_interactions_pd = RAW_interactions_pd.drop(index = _drop_id)
-RAW_interactions_pd.to_csv(Path(__file__).parent.parent / "data" / "RAW_interactions_cleaned.csv", index=False)
-print(f"{RAW_interactions_pd.shape}") # (234428, 5)
+# groupby("recipe_id")：按照菜谱ID进行分组。
+# ["user_id"]：获取每组中的用户ID。
+# nunique()：统计不同用户的数量，重复用户只计算一次。
+recipe_counts = RAW_interactions_pd.groupby("recipe_id")["user_id"].nunique()
+```
+然后按照用户数量降序排列, 这一步删除也不会影响训练
+```python
+# sort_values()根据Series的值进行排序。
+# - ascending = True：升序，从小到大。
+# - ascending = False：降序，从大到小。
+#  这个是为了打印方便
+recipe_counts = recipe_counts.sort_values(ascending=False)
 ```
 
-我现在希望可以像Google一样绘制分布图， 追踪一个用户并分析他的喜好， 用户 id 为 5060 , 先试试他的。
-从他的食物里选五个：
-- very gouda pecan biscuits	高达奶酪碧根果饼干
-- salad	沙拉
-- creole veggie burgers	克里奥尔风味素食汉堡
-- french strawberry crepes	法式草莓可丽饼
-- fresh tomato soup with rice	鲜番茄米饭汤
-![用户5060喜爱程度](用户5060喜爱程度.png)
 
-可以看到，这里手动选取了部分数据，用评分来表示用户对食物的喜爱程度。但是由于评分的取值范围有限，导致大量评分相同的食物在空间中重合。
-当前没有引入其他具有明确含义的特征，因此暂时只进行一维空间的可视化。
+获取至少被 30 个不同用户评价过的菜谱 ID。
+```python
+valid_recipes = recipe_counts[recipe_counts >= 30].index
+```
+
+然后把低频菜谱从数据中删除
+```python
+RAW_interactions_pd = RAW_interactions_pd[
+    RAW_interactions_pd["recipe_id"].isin(valid_recipes)
+].reset_index(drop=True)
+```
+
+`RAW_interactions_pd["recipe_id"].isin(valid_recipes)` 的 isin() 用来判断每条评价的 recipe_id 是否存在于 valid_recipes 中。
+
+---
+
+我们的训练任务需要每个用户提供至少五种不同的菜谱，其中四种作为输入特征，一种作为标签。所以需要删除评论少于5个的用户
+
+```python
+user_counts = RAW_interactions_pd.groupby("user_id")["recipe_id"].nunique()
+users = user_counts[user_counts >= 5].index.tolist()
+```
+
+划分训练集、验证集和测试集
+```python
+users_train, users_temp = train_test_split(
+    users, train_size=0.8, random_state=42
+)
+
+users_val, users_test = train_test_split(
+    users_temp, train_size=0.5, random_state=42
+)
+```
+现在已经将用户划分为三个集合，分别是训练集、验证集和测试集。然后根据这些用户获取对应的菜谱 ID，构建训练输入和标签。
+由于原始菜谱 ID 不连续，直接作为 Embedding 的索引会浪费大量空间，所以需要将菜谱 ID 映射为从 0 开始的连续整数索引，
+作为模型的输入和标签。 
+```python
+def build_samples(userlist) -> tuple[torch.Tensor, torch.Tensor]:
+    __x = []
+    __y = []
+    for user_id in userlist:
+        recipes = RAW_interactions_pd.loc[
+            RAW_interactions_pd["user_id"] == user_id,
+            ["recipe_id", "rating"]
+        ]
+        recipes = recipes.sort_values("rating", ascending=False)
+        recipes = recipes.drop_duplicates(subset="recipe_id").head(5)
+
+        recipe_ids = recipes["recipe_id"].tolist()
+
+        ___x = []
+        for recipe_id in recipe_ids:
+            if recipe_id not in recipe_id_to_index:
+                recipe_id_to_index[recipe_id] = len(recipe_id_to_index)
+
+            ___x.append(recipe_id_to_index[recipe_id])
+        # 每种菜谱轮流作为标签
+        for i in range(len(___x)):
+            __x.append(___x[:i] + ___x[i + 1:])
+            __y.append(___x[i])
+
+    _x = torch.tensor(__x, dtype=torch.long)
+    _y = torch.tensor(__y, dtype=torch.long)
+
+    return _x, _y
+
+# 分别获取三个数据集
+x_train, y_train = build_samples(users_train)
+x_val, y_val = build_samples(users_val)
+x_test, y_test = build_samples(users_test)
+```
+
+损失函数仍然使用之前多分类任务中学习过的交叉熵损失函数（Cross Entropy Loss）。
+```python
+# 损失函数
+loss_fn = torch.nn.CrossEntropyLoss().to(_device)
+```
+
+但是模型要改一下， `torch.nn.Embedding` 是 PyTorch 提供的嵌入层（Embedding Layer）
+而且神经网络很小是因为不是越深越好， 我测试后发现这个层数的过拟合程度要比更深的神经网络轻
+```python
+class FoodClassifier(torch.nn.Module):
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+        self.embedding = torch.nn.Embedding(
+            num_embeddings=2420,
+            embedding_dim=3
+        )
+        self.network = torch.nn.Sequential(
+
+            torch.nn.Linear(in_features=3, out_features=8),
+            torch.nn.ReLU(),
+
+            torch.nn.Linear(in_features=8, out_features=2420),
+        )
+
+    def forward(self, x):
+        # 前向传播
+        x = self.embedding(x)
+        x = x.mean(dim=1)
+        return self.network(x)
+```
+
+
+优化器我想尝试一下之前看起来很牛逼但是没用过的 `moun` 优化器
+这次我用 `moun` 和 `adamw` 优化器， 只有输入层用 `moun`
+这个修改比单纯的用 AdamW 只好一点没有明显的改善
+```python
+# 优化器
+muon_params = []
+adamw_params = []
+
+for name, param in _model.named_parameters():
+    if name == "network.0.weight":
+        muon_params.append(param)
+    else:
+        adamw_params.append(param)
+    print(name)
+
+_optimizer_muon = torch.optim.Muon(
+    muon_params,
+    lr=_learning_rate,
+    weight_decay=_weight_decay
+)
+
+_optimizer_adamw = torch.optim.AdamW(
+    adamw_params,
+    lr=_learning_rate,
+    weight_decay=_weight_decay
+)
+```
+
+因为用了两个优化器所以训练时的梯度下降也要改
+```python
+# 3. 反向传播
+optimizer_adamw.zero_grad()  # 清空之前的梯度
+optimizer_muon.zero_grad()  # 清空之前的梯度
+
+loss.backward()  # 计算梯度
+
+optimizer_adamw.step()  # 更新模型参数
+optimizer_muon.step()  # 更新模型参数
+```
+
+到最后模型过拟合程度仍然很高， 我修改了优化器的正则化， 效果并不好
+
+所以最后只好用 早停法 让模型停在一个还算不错的 loss 下，虽然效果还是不好但是这个训练方向从一开始就不指望可以训练的太好， 只是想试试 google 讲的内容
+
+![模型损失](模型损失.png)
+
